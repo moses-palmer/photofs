@@ -1,0 +1,864 @@
+#!/usr/bin/env python
+
+import os
+import stat
+import sys
+import time
+
+# For FUSE
+import errno
+import fuse
+fuse.fuse_python_api = (0, 2)
+
+# For guessing whether a file is an image or a video when the source does not
+# know
+import mimetypes
+
+from urllib2 import urlparse
+from xdg.BaseDirectory import xdg_config_dirs, xdg_data_dirs
+
+
+# Give the user a warning if sqlite cannot be imported
+try:
+    import sqlite3
+except ImportError:
+    print('This program requires sqlite3')
+    sys.exit(1)
+
+
+def make_unique(mapping, base_name, format_1, format_n, *args):
+    """Creates a unique key in a ``dict``.
+
+    First the string ``format_1 % base_name`` is tried. If that is present in
+    ``mapping``, the strings ``format_n % ((base_name, n) + args)`` with ``n``
+    incrementing from ``2`` are tried until a unique one is found.
+
+    :param str base_name: The name of the file without extension.
+
+    :param str format_1: The initial format string. This will be passed
+        ``base_name`` followed by ``args``.
+
+    :param str format_n: The fallback format string. This will be passed
+        ``base_name`` followed by an index and then ``args``.
+
+    :param args: Format string arguments used.
+
+    :return: a unique key
+    :rtype: str
+    """
+    i = 1
+    key = format_1 % ((base_name,) + args)
+    while key in mapping:
+        i += 1
+        key = format_n % ((base_name, i) + args)
+
+    return key
+
+
+class Image(object):
+    """An image or video.
+    """
+    def __init__(self, location, timestamp, title, is_video = None):
+        """
+        Initialises an image.
+
+        :param str location: The location of this image in the file system.
+
+        :param int timestamp: The timestamp when this image or video was
+            created.
+
+        :param str title: The title of the image. This should be used to
+            generate the file name. If the ``title`` is empty or ``None``,
+            ``timestamp`` should be used instead.
+
+        :param bool is_video: Whether this image is a video. This must be either
+            ``True`` or ``False``, or ``None``. If it is ``None``, the type is
+            inferred from the file *MIME type*.
+        """
+        super(Image, self).__init__()
+        self._location = location
+        self._timestamp = timestamp
+        self._title = title
+        if is_video is None:
+            mime, encoding = mimetypes.guess_type(location)
+            self._is_video = mime and mime.startswith('video/')
+        else:
+            self._is_video = is_video
+
+    @property
+    def location(self):
+        """The location of this image or video in the file system."""
+        return self._location
+
+    @property
+    def timestamp(self):
+        """The timestamp when this image or video was created."""
+        return self._timestamp
+
+    @property
+    def title(self):
+        """The title of this image. Use this to generate the file name if it is
+        set."""
+        return self._title
+
+    @property
+    def is_video(self):
+        """Whether this image is a video."""
+        return self._is_video
+
+
+class Tag(dict):
+    """A tag applied to an image or a video.
+
+    An image or video may have several tags applied. In that case an image with
+    the same location will be present in the image collection of several tags.
+    The image references may not be equal.
+
+    Tags are hierarchial. A tag may have zero or one parent, and any number of
+    children. The parent-child relationship is noted in the name of tags: the
+    name of a tag will be ``<name of grandparents..>/<name of parent>/<name>``.
+    """
+
+    def _make_unique(self, base_name, ext):
+        """Creates a unique key in this dict.
+
+        See :func:`make_unique` for more information.
+
+        :param str base_name: The name of the file without extension.
+
+        :param str ext: The file extension. A dot (``'.'``) is not added
+            automatically; this must be present in ``ext``.
+
+        :return: a unique key
+        :rtype: str
+        """
+        return make_unique(self, base_name, '%s%s', '%s (%d)%s', ext)
+
+    def __setitem__(self, k, v):
+        # Make sure keys are strings and items are images or tags
+        if not isinstance(k, str) and not (False
+                or isinstance(v, Image)
+                or isinstance(v, Tag)):
+            raise ValueError('Cannot add %s to Tag',
+                str(v))
+
+        super(Tag, self).__setitem__(k, v)
+
+    def __init__(self, name, parent = None):
+        """Initialises a named tag.
+
+        :param str name: The name of the tag.
+
+        :param Tag parent: The parent tag. This is used to create the full name
+            of the tag. If this is ``None``, a root tag is created, otherwise
+            this tag is added to the parent tag.
+        """
+        super(Tag, self).__init__()
+        self._name = name
+        self._parent = parent
+
+        # Make sure to add ourselves to the parent tag if specified
+        if parent:
+            parent.add(self)
+
+    @property
+    def name(self):
+        """The name of this tag."""
+        return self._name
+
+    @property
+    def path(self):
+        """The full path of this tag. This is an absolute path."""
+        return os.path.sep.join((self._parent.path, self._name)) \
+            if self._parent else os.path.sep + self._name
+
+    @property
+    def parent(self):
+        """The parent of this tag."""
+        return self._parent
+
+    def add(self, item):
+        """Adds an image or tag to this tag.
+
+        If a tag is added, it will be stored with the key ``item.name``. If this
+        key already has a value, the following action is taken:
+
+        - If the value is a tag, the new tag overwrites it.
+        - If the value is an image, a new unique name is generated and the
+          image is moved.
+
+        :param item:
+            An image or a tag.
+        :type item: Image or Tag
+
+        :raises ValueError: if item is not an instance of :class:`Image` or
+            :class:`Tag`
+        """
+        if isinstance(item, Image):
+            name, ext = os.path.splitext(item.location)
+
+            # Make sure the key name is unique
+            key = self._make_unique(item.title, ext.lower())
+            self[key] = item
+
+        elif isinstance(item, Tag):
+            previous = self.get(item.name)
+            self[item.name] = item
+
+            # Re-add the previous item if it was an image
+            if isinstance(previous, Image):
+                self.add(previous)
+
+        else:
+            raise ValueError('Cannot add %s to a Tag',
+                str(item))
+
+
+class ImageSource(dict):
+    """A source of images and tags.
+
+    This is an abstract class.
+    """
+    #: A mapping of all registered sources by name to implementing classes
+    SOURCES = {}
+
+    @classmethod
+    def register(self, name):
+        """A decorator that registers an :class:`ImageSource` subclass as an
+        image source.
+
+        :param str name: The name of the image source.
+        """
+        def inner(cls):
+            self.SOURCES[name] = cls
+            return cls
+        return inner
+
+    def _default_location(self):
+        """Returns the default location of the backend resource.
+
+        :return: the default location of the backend resource, or ``None`` if
+            none exists
+        :rtype: str or None
+        """
+        raise NotImplementedError()
+
+    def _load_tags(self):
+        """Loads the tags from the backend resource.
+
+        This function is called by refresh if the timestamp of the backend
+        resource has changed.
+
+        :return: a list of tags with the images attached
+        :rtype: [Tag]
+        """
+        raise NotImplementedError()
+
+    def _break_path(self, path):
+        """Breaks an absolute path into its segments.
+
+        :param str path: The absolute path to break, for example
+            ``'/Tag/Other/Third'``, which will yield
+            ``['Tag', 'Other', 'Third']``. This string must begin with
+            :attr:`os.path.sep`.
+
+        :raises ValueError: if path does not begin with os.path.sep
+
+        :return: the path elements
+        :rtype: [str]
+        """
+        # Make sure the path begins with a path separator
+        if path[0] != os.path.sep:
+            raise ValueError('"%s" does not begin with "%s"',
+                path,
+                os.path.sep)
+        elif path == os.path.sep:
+            return []
+
+        return path.split(os.path.sep)[1:]
+
+    def _make_unique(self, directory, base_name, ext):
+        """Creates a unique key in the map ``directory``.
+
+        See :func:`make_unique` for more information.
+
+        :param dict directory: The map in which to create the unique key.
+
+        :param str base_name: The name of the file without extension.
+
+        :param str ext: The file extension. A dot (``'.'``) is not added
+            automatically; this must be present in ``ext``.
+
+        :return: a unique key
+        :rtype: str
+        """
+        return make_unique(directory, base_name, '%s%s', '%s (%d)%s', ext)
+
+    def _make_tags(self, path):
+        """Makes sure that all tags up until the last element of ``path`` exist.
+
+        :param str path: The absolute path of the tag to make, for example
+            ``'/Tag/Other/Third'``. This string must begin with
+            :attr:`os.path.sep`.
+
+        :raises ValueError: if ``path`` does not begin with :attr:`os.path.sep`
+
+        :return: the last tag; ``Third`` in the example above
+        :rtype: Tag
+        """
+        segments = self._break_path(path)
+
+        # Create all tags
+        current = self
+        for segment in segments:
+            if not segment in current:
+                tag = Tag(segment, current if current != self else None)
+                if current == self:
+                    # If the tag does not exist, and this is a root tag
+                    # (current == self => this is the first iteration), add the
+                    # tag to self; the parent parameter to Tag above will handle
+                    # other cases
+                    self[segment] = tag
+            current = current[segment]
+
+        return current
+
+    def __init__(self, path = None, date_format = '%Y-%m-%d, %H.%M', **kwargs):
+        """Creates a new ImageSource.
+
+        :param str path: The path to the backend database or directory for this
+            image source. If :meth:`refresh` is not overloaded, this must be a
+            valid file name. Its timestamp is used to determine whether to
+            actually reload all images and tags. If this is not provided, a
+            default location is used.
+
+        :param str date_format: The date format to use when creating file names
+            for images that do not have a title.
+        """
+        super(ImageSource, self).__init__()
+        self._path = path or self._default_location()
+        if self._path is None:
+            raise ValueError('No database')
+        self._date_format = date_format
+        self._timestamp = 0
+
+    @property
+    def path(self):
+        """The path of the backend resource containing the images and tags."""
+        return self._path
+
+    @property
+    def timestamp(self):
+        """The timestamp when the backend resource was last modified."""
+        return self._timestamp
+
+    def refresh(self):
+        """Reloads all images and tags from the backend resource if it has
+        changed since the last update.
+
+        If the last modification time of :attr:`path` has changed, the backend
+        resource is considered to be changed as well.
+
+        In this case, the internal timestamp is updated and :meth:`_load_tags`
+        is called.
+        """
+        # Check the timestamp
+        if self._path:
+            timestamp = os.stat(self._path).st_mtime
+            if timestamp == self._timestamp:
+                return
+            self._timestamp = timestamp
+
+        # Release the old data and reload the tags
+        self.clear()
+        self._load_tags()
+
+    def locate(self, path):
+        """Locates an image or tag.
+
+        :param str path: The absolute path of the item to locate, for example
+            ``'/Tag/Other/Image.jpg'``. This string must begin with
+            :attr:`os.path.sep`.
+
+        :return: a tag or an image
+        :rtype: Tag or Image
+
+        :raises KeyError: if the item does not exist
+
+        :raises ValueError: if path does not begin with os.path.sep
+        """
+        segments = self._break_path(path)
+
+        # Locate the last item
+        current = self
+        for segment in segments:
+            current = current[segment]
+
+        return current
+
+
+@ImageSource.register('shotwell')
+class ShotwellSource(ImageSource):
+    """Loads images and videos from Shotwell.
+    """
+    def _default_location(self):
+        """Determines the location of the *Shotwell* database.
+
+        :return: the location of the database, or ``None`` if it cannot be
+            located
+        :rtype: str or None
+        """
+        for d in xdg_data_dirs:
+            result = os.path.join(d, 'shotwell', 'data', 'photo.db')
+            if os.access(result, os.R_OK):
+                return result
+
+    def _load_tags(self):
+        db = sqlite3.connect(self._path)
+        try:
+            # The descriptions of the different image tables; the value tuple is
+            # the header of the ID in the tag table, the map of IDs to images
+            # and whether the table contains videos
+            db_tables = {
+                'phototable': ('thumb', {}, False),
+                'videotable': ('video-', {}, True)}
+
+            # Load the images
+            for table_name, (header, images, is_video) in db_tables.items():
+                results = db.execute("""
+                    SELECT id, filename, exposure_time, title
+                        FROM %s""" % table_name)
+                for r_id, r_filename, r_exposure_time, r_title in results:
+                    # Make sure the title is set to a reasonable value
+                    if not r_title:
+                        r_title = time.strftime(self._date_format,
+                            time.localtime(r_exposure_time))
+
+                    images[r_id] = Image(r_filename.encode('utf-8'),
+                        int(r_exposure_time), r_title.encode('utf-8'),
+                        is_video)
+
+            # Load the tags
+            results = db.execute("""
+                SELECT name, photo_id_list
+                    FROM tagtable
+                    ORDER BY name""")
+            for r_name, r_photo_id_list in results:
+                # Ignore unused tags
+                if not r_photo_id_list:
+                    continue
+
+                # Hierachial tag names start with '/'
+                path = r_name.split('/') if r_name[0] == '/' else ['', r_name]
+                path_name = os.path.sep.join(path)
+
+                # Make sure that the tag and all its parents exist
+                tag = self._make_tags(path_name.encode('utf-8'))
+
+                # The IDs are all in the text of photo_id_list, separated by
+                # commas; there is an extra comma at the end
+                ids = r_photo_id_list.split(',')[:-1]
+
+                # Iterate over all image IDs and move them to this tag
+                for i in ids:
+                    if i[0].isdigit():
+                        # If the first character is a digit, this is a legacy
+                        # source ID and an ID in the photo table
+                        image = db_tables['phototable'][1].get(int(i))
+                    else:
+                        # Iterate over all database tables and locate the image
+                        # instance for the current ID
+                        image = None
+                        for table_name, (header, images, is_video) \
+                                in db_tables.items():
+                            if not i.startswith(header):
+                                continue
+                            image = images.get(int(i[len(header):], 16))
+                            break
+
+                    # Verify that the tag only references existing images
+                    if image is None:
+                        continue
+
+                    # Remove the image from the parent tags
+                    parent = tag.parent
+                    while parent:
+                        for k, v in parent.items():
+                            if v == image:
+                                del parent[k]
+                        parent = parent.parent
+
+                    # Finally add the image to this tag
+                    tag.add(image)
+
+        finally:
+            db.close()
+
+
+class PhotoFS(fuse.Fuse):
+    """An implementation of a *FUSE* file system.
+
+    It presents the tagged image libraries from image sources as a tag tree in
+    the file system.
+    """
+    def __init__(self):
+        super(PhotoFS, self).__init__()
+
+        self.source = ImageSource.SOURCES.keys()[0]
+        self.parser.add_option(mountopt = 'source', metavar = 'SOURCE',
+            default = self.source,
+            help = 'The image and video source to use. Valid values are: \n' \
+                + ', '.join(['%s: %s' % (k, v.__doc__)
+                    for (k, v) in ImageSource.SOURCES.items()]) \
+                + ' Default: %default')
+
+        self.database = None
+        self.parser.add_option(mountopt = 'database', metavar = 'DATABASE',
+            default = self.database,
+            help = 'The database file to use. You do not need to specify ' \
+                + 'this if you are using the default database for the source.')
+
+        self.photo_path = 'Photos'
+        self.parser.add_option(mountopt = 'photo_path', metavar = 'PATH',
+            default = self.photo_path,
+            help = 'The directory in which to place all photo tag ' \
+                + 'subdirectories. Default: %default')
+
+        self.video_path = 'Videos'
+        self.parser.add_option(mountopt = 'video_path', metavar = 'PATH',
+            default = self.video_path,
+            help = 'The directory in which to place all video tag ' \
+                + 'subdirectories. Default: %default')
+
+        self.rewrite_path = None
+        self.parser.add_option(mountopt = 'rewrite_path',
+            metavar = 'SOURCE=>TARGET', default = self.rewrite_path,
+            help = 'The path rewrite rule. Specify this as source=>target. ' \
+                + 'Any path starting with source will be moved to target ' \
+                + 'when creating links.')
+
+        self.date_format = '%Y-%m-%d, %H.%M'
+        self.parser.add_option(mountopt = 'date_format', metavar = 'FORMAT',
+            default = self.date_format,
+            help = 'The date format to use when creating file names.\n' \
+                + 'Default: %default.')
+
+        self.creation = None
+        self.image_source = None
+        self.resolvers = {}
+
+    def fsinit(self):
+        try:
+            # Make sure the photo and video paths are strs
+            self.photo_path = str(self.photo_path)
+            self.video_path = str(self.video_path)
+
+            # Create the image source
+            self.image_source = ImageSource.SOURCES[self.source](
+                self.database, self.date_format)
+
+            # Load the photo and video resolvers
+            self.resolvers = {
+                self.photo_path: self.ImageResolver(self.image_source,
+                    lambda i: not i.is_video),
+                self.video_path: self.ImageResolver(self.image_source,
+                    lambda i: i.is_video)}
+
+            # Store the current time as timestamp for directories
+            self.creation = int(time.time())
+
+            # Parse the rewrite value
+            if self.rewrite_path:
+                rewrite_path = self.rewrite_path.split('=>')
+                if len(rewrite_path) != 2:
+                    raise ValueError('%s is not a valid rewrite rule',
+                        self.rewrite_path)
+                self.rewrite_path = rewrite_path
+
+        except Exception as e:
+            try:
+                print('Failed to initialise file system: %s'
+                    % e.args[0] % e.args[1:])
+            except:
+                print('Failed to initialise file system: %s'
+                    % str(e))
+
+    class ImageResolver(object):
+        """This class resolves image requests.
+        """
+        def __init__(self, image_source, include_filter):
+            """Creates an image resolver for a specific source and filter.
+
+            :param ImageSource image_source: The image source from which to
+                retrieve images.
+
+            :param include_filter: The filter function to apply to images. This
+                function will only be passed instances of :class:`Image`.
+                :class:`Tag` instances which contain no unfiltered images or
+                subtags will automatically be filtered out.
+            """
+            def recursive_filter(item):
+                """The recursive filter used to actually filter the image source.
+
+                This function will simply call include_filter in the outer scope
+                if item is an instance of :class:`Image`, otherwise it will
+                recursively call itself on all items in the tag, and return
+                whether the filtered tag contains any subitems.
+
+                :param item: The item to filter.
+                :type item: Image or Tag
+
+                :return: ``True`` if the item should be kept and ``False``
+                    otherwise
+                """
+                if isinstance(item, Image):
+                    return include_filter(item)
+                elif isinstance(item, Tag):
+                    return len(filter(recursive_filter, item.values())) > 0
+                else:
+                    return False
+
+            self.image_source = image_source
+            self._include_filter = recursive_filter
+
+            self.image_source.refresh()
+
+        def getattr(self, root, path):
+            """Performs a stat on ``/root/path``.
+
+            :param str root: The first segment of the path, which contains the
+                string that caused this resolver to be picked by
+                :class:`PhotoFS`.
+
+            :param str path: The path to resolve. This has to begin with
+                :attr:`os.path.sep`.
+
+            :return: a :class:`fuse.Stat` object for the path, or an error code
+                otherwise
+            :rtype: fuse.Stat or int
+            """
+            self.image_source.refresh()
+            try:
+                item = self.image_source.locate(path)
+
+                if isinstance(item, Image):
+                    # This is a file
+                    return os.lstat(item.location)
+
+                elif isinstance(item, dict):
+                    # This is a directory; this matches both Tag and ImageSource
+                    return fuse.Stat(
+                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
+                        st_nlink = 2,
+                        st_atime = int(time.time()),
+                        st_mtime = int(time.time()),
+                        st_ctime = self.image_source.timestamp)
+
+                else:
+                    raise RuntimeError('Unknown object: %s',
+                        os.path.sep.join(root, path))
+
+            except KeyError:
+                return -errno.ENOENT
+
+        def readdir(self, root, path):
+            """Performs a directory listing on ``/root/path``.
+
+            :param str root: The first segment of the path, which contains the
+                string that caused this resolver to be picked by
+                :class:`PhotoFS`.
+
+            :param str path: The path to resolve. This has to begin with
+                :attr:`os.path.sep`, and it must be resolved to a dictionary.
+
+            :return: a sequence of :class:`fuse.Direntry` instances describing
+                the directory, or an error code if the directory could not be
+                read
+            :rtype: fuse.Direntry or int
+            """
+            self.image_source.refresh()
+            try:
+                item = self.image_source.locate(path)
+
+                if isinstance(item, dict):
+                    # This is a directory; this matches both Tag and ImageSource
+                    return [fuse.Direntry(d)
+                        for d in ['.', '..'] + [k for k, v in item.items()
+                            if self._include_filter(v)]]
+
+                else:
+                    raise RuntimeError('Unknown object: %s',
+                        os.path.join(root, path))
+
+            except KeyError:
+                return -errno.ENOENT
+
+        def readlink(self, root, path):
+            """Returns the link target of a path.
+
+            :param str root: The first segment of the path, which contains the
+                string that caused this resolver to be picked by
+                :class:`PhotoFS`.
+
+            :param str path: The path to resolve. This has to begin with
+                :attr:`os.path.sep`, and it must resolve to an image.
+
+            :return: a :class:`fuse.Stat` object for the path, or an error code
+                otherwise
+            :rtype: fuse.Stat or int
+            """
+            self.image_source.refresh()
+            try:
+                item = self.image_source.locate(path)
+
+                if isinstance(item, Image):
+                    # This is a file
+                    return item.location
+
+                else:
+                    raise RuntimeError('Unknown object: %s',
+                        os.path.sep.join(root, path))
+
+            except KeyError:
+                return -errno.ENOENT
+
+
+    def split_path(self, path):
+        """Returns the tuple ``(root, rest)`` for a path, where ``root`` is the
+        directory immediately beneath the root and ``rest`` is anything after
+        that.
+
+        :param str path: The path to split. This must begin with
+            :attr:`os.path.sep`.
+
+        :return: a tuple containing the split path, which may be empty strings
+
+        :raises ValueError: if ``path`` does not begin with :attr:`os.path.sep`
+        """
+        if path[0] != os.path.sep:
+            raise ValueError('%s is not a valid path',
+                path)
+        path = path[len(os.path.sep):]
+
+        if os.path.sep in path:
+            return path.split(os.path.sep, 1)
+        else:
+            return (path, '')
+
+    def rewrite(self, source):
+        """Removes the first part of source if it is the rewrite source and
+        replaces it with the rewrite target.
+
+        This function returns ``source`` if no rewrite rule has been defined.
+
+        :param str source: The source to rewrite.
+
+        :return: ``source`` rewritten
+        :rtype: str
+        """
+        if self.rewrite_path \
+                and source.startswith(self.rewrite_path[0] + os.path.sep):
+            return os.path.sep.join((
+                self.rewrite_path[1],
+                source[len(self.rewrite_path[0]):]))
+        else:
+            return source
+
+    def getattr(self, path):
+        try:
+            root, rest = self.split_path(path)
+
+            if not rest:
+                # Unless path is the root, it must be in the resolvers; the root
+                # and any items directly below it are directories
+                if root and not root in self.resolvers:
+                    return -errno.ENOENT
+                else:
+                    return fuse.Stat(
+                        # Not used, but must be set
+                        st_dev = 0,
+                        st_blksize = 0,
+                        st_size = 0,
+                        st_blocks = 0,
+
+                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
+
+                        st_nlink = 2,
+
+                        st_uid = 1000,
+                        st_gid = 1000,
+
+                        st_atime = int(time.time()),
+                        st_mtime = int(time.time()),
+                        st_ctime = self.creation)
+
+            return self.resolvers[root].getattr(root, os.path.sep + rest)
+
+        except KeyError:
+            return -errno.ENOENT
+
+        except OSError as e:
+            return -e.errno
+
+
+    def readdir(self, path, offset):
+        try:
+            root, rest = self.split_path(path)
+
+            if not root:
+                # The root contains the resolver names
+                return [fuse.Direntry(d)
+                    for d in ['.', '..'] + self.resolvers.keys()]
+
+            return self.resolvers[root].readdir(root, os.path.sep + rest)
+
+        except KeyError:
+            return -errno.ENOENT
+
+        except OSError as e:
+            return -e.errno
+
+    def readlink(self, path):
+        try:
+            root, rest = self.split_path(path)
+
+            # A call to readlink may only happen on an item in a resolver
+            return self.rewrite(self.resolvers[root].readlink(
+                root, os.path.sep + rest))
+
+        except KeyError:
+            return -errno.ENOENT
+
+        except OSError as e:
+            return -e.errno
+
+    def open(self, path, flags):
+        # Get the source file; this will be an errno constant on error
+        source_or_error = self.readlink(path)
+        if isinstance(source_or_error, int):
+            return source_or_error
+
+        # Return a file object
+        return open(source_or_error, 'rb')
+
+    def release(self, path, flags, fh):
+        try:
+            fh.close()
+        except:
+            return -errno.EINVAL
+
+    def read(self, path, size, offset, fh):
+        fh.seek(offset)
+        return fh.read(size)
+
+
+def main():
+    photo_fs = PhotoFS()
+    photo_fs.parse(values = photo_fs, errex = 1)
+
+    photo_fs.main()
+
+
+if __name__ == '__main__':
+    main()
+
