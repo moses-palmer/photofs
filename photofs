@@ -520,12 +520,6 @@ class PhotoFS(fuse.Fuse):
         super(PhotoFS, self).__init__()
 
         self.source = ImageSource.SOURCES.keys()[0]
-        self.parser.add_option(mountopt = 'source', metavar = 'SOURCE',
-            default = self.source,
-            help = 'The image and video source to use. Valid values are: \n' \
-                + ', '.join(['%s: %s' % (k, v.__doc__)
-                    for (k, v) in ImageSource.SOURCES.items()]) \
-                + ' Default: %default')
 
         self.database = None
         self.parser.add_option(mountopt = 'database', metavar = 'DATABASE',
