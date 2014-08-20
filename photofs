@@ -708,36 +708,6 @@ class PhotoFS(fuse.Fuse):
             except KeyError:
                 return -errno.ENOENT
 
-        def readlink(self, root, path):
-            """Returns the link target of a path.
-
-            :param str root: The first segment of the path, which contains the
-                string that caused this resolver to be picked by
-                :class:`PhotoFS`.
-
-            :param str path: The path to resolve. This has to begin with
-                :attr:`os.path.sep`, and it must resolve to an image.
-
-            :return: a :class:`fuse.Stat` object for the path, or an error code
-                otherwise
-            :rtype: fuse.Stat or int
-            """
-            self.image_source.refresh()
-            try:
-                item = self.image_source.locate(path)
-
-                if isinstance(item, Image):
-                    # This is a file
-                    return item.location
-
-                else:
-                    raise RuntimeError('Unknown object: %s',
-                        os.path.sep.join(root, path))
-
-            except KeyError:
-                return -errno.ENOENT
-
-
     def split_path(self, path):
         """Returns the tuple ``(root, rest)`` for a path, where ``root`` is the
         directory immediately beneath the root and ``rest`` is anything after
@@ -759,25 +729,6 @@ class PhotoFS(fuse.Fuse):
             return path.split(os.path.sep, 1)
         else:
             return (path, '')
-
-    def rewrite(self, source):
-        """Removes the first part of source if it is the rewrite source and
-        replaces it with the rewrite target.
-
-        This function returns ``source`` if no rewrite rule has been defined.
-
-        :param str source: The source to rewrite.
-
-        :return: ``source`` rewritten
-        :rtype: str
-        """
-        if self.rewrite_path \
-                and source.startswith(self.rewrite_path[0] + os.path.sep):
-            return os.path.sep.join((
-                self.rewrite_path[1],
-                source[len(self.rewrite_path[0]):]))
-        else:
-            return source
 
     def getattr(self, path):
         try:
@@ -834,18 +785,8 @@ class PhotoFS(fuse.Fuse):
             return -e.errno
 
     def readlink(self, path):
-        try:
-            root, rest = self.split_path(path)
-
-            # A call to readlink may only happen on an item in a resolver
-            return self.rewrite(self.resolvers[root].readlink(
-                root, os.path.sep + rest))
-
-        except KeyError:
-            return -errno.ENOENT
-
-        except OSError as e:
-            return -e.errno
+        # Links are not supported
+        return -errno.ENOENT
 
     def open(self, path, flags):
         # Get the source file; this will be an errno constant on error
