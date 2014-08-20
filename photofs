@@ -545,13 +545,6 @@ class PhotoFS(fuse.Fuse):
             help = 'The directory in which to place all video tag ' \
                 + 'subdirectories. Default: %default')
 
-        self.rewrite_path = None
-        self.parser.add_option(mountopt = 'rewrite_path',
-            metavar = 'SOURCE=>TARGET', default = self.rewrite_path,
-            help = 'The path rewrite rule. Specify this as source=>target. ' \
-                + 'Any path starting with source will be moved to target ' \
-                + 'when creating links.')
-
         self.date_format = '%Y-%m-%d, %H.%M'
         self.parser.add_option(mountopt = 'date_format', metavar = 'FORMAT',
             default = self.date_format,
@@ -581,14 +574,6 @@ class PhotoFS(fuse.Fuse):
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
-
-            # Parse the rewrite value
-            if self.rewrite_path:
-                rewrite_path = self.rewrite_path.split('=>')
-                if len(rewrite_path) != 2:
-                    raise ValueError('%s is not a valid rewrite rule',
-                        self.rewrite_path)
-                self.rewrite_path = rewrite_path
 
         except Exception as e:
             try:
