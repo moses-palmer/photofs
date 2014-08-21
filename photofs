@@ -550,6 +550,7 @@ class PhotoFS(fuse.Fuse):
                 '%default.')
 
         self.creation = None
+        self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
@@ -565,13 +566,16 @@ class PhotoFS(fuse.Fuse):
 
             # Load the photo and video resolvers
             self.resolvers = {
-                self.photo_path: self.ImageResolver(self.image_source,
+                self.photo_path: self.ImageResolver(self,
                     lambda i: not i.is_video),
-                self.video_path: self.ImageResolver(self.image_source,
+                self.video_path: self.ImageResolver(self,
                     lambda i: i.is_video)}
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
+
+            # Use the lstat result of the database directory for all directories
+            self.dirstat = os.lstat(os.path.dirname(self.image_source.path))
 
         except Exception as e:
             try:
@@ -584,11 +588,10 @@ class PhotoFS(fuse.Fuse):
     class ImageResolver(object):
         """This class resolves image requests.
         """
-        def __init__(self, image_source, include_filter):
+        def __init__(self, file_system, include_filter):
             """Creates an image resolver for a specific source and filter.
 
-            :param ImageSource image_source: The image source from which to
-                retrieve images.
+            :param PhotoFS file_system: The photofs instance.
 
             :param include_filter: The filter function to apply to images. This
                 function will only be passed instances of :class:`Image`.
@@ -616,10 +619,10 @@ class PhotoFS(fuse.Fuse):
                 else:
                     return False
 
-            self.image_source = image_source
+            self.fs = file_system
             self._include_filter = recursive_filter
 
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
 
         def getattr(self, root, path):
             """Performs a stat on ``/root/path``.
@@ -635,9 +638,9 @@ class PhotoFS(fuse.Fuse):
                 otherwise
             :rtype: fuse.Stat or int
             """
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
             try:
-                item = self.image_source.locate(path)
+                item = self.fs.image_source.locate(path)
 
                 if isinstance(item, Image):
                     # This is a file
@@ -645,12 +648,7 @@ class PhotoFS(fuse.Fuse):
 
                 elif isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
-                    return fuse.Stat(
-                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
-                        st_nlink = 2,
-                        st_atime = int(time.time()),
-                        st_mtime = int(time.time()),
-                        st_ctime = self.image_source.timestamp)
+                    return self.fs.dirstat
 
                 else:
                     raise RuntimeError('Unknown object: %s',
@@ -674,9 +672,9 @@ class PhotoFS(fuse.Fuse):
                 read
             :rtype: fuse.Direntry or int
             """
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
             try:
-                item = self.image_source.locate(path)
+                item = self.fs.image_source.locate(path)
 
                 if isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
@@ -723,23 +721,7 @@ class PhotoFS(fuse.Fuse):
                 if root and not root in self.resolvers:
                     return -errno.ENOENT
                 else:
-                    return fuse.Stat(
-                        # Not used, but must be set
-                        st_dev = 0,
-                        st_blksize = 0,
-                        st_size = 0,
-                        st_blocks = 0,
-
-                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
-
-                        st_nlink = 2,
-
-                        st_uid = 1000,
-                        st_gid = 1000,
-
-                        st_atime = int(time.time()),
-                        st_mtime = int(time.time()),
-                        st_ctime = self.creation)
+                    return self.dirstat
 
             return self.resolvers[root].getattr(root, os.path.sep + rest)
 
