@@ -520,43 +520,34 @@ class PhotoFS(fuse.Fuse):
         super(PhotoFS, self).__init__()
 
         self.source = ImageSource.SOURCES.keys()[0]
-        self.parser.add_option(mountopt = 'source', metavar = 'SOURCE',
-            default = self.source,
-            help = 'The image and video source to use. Valid values are: \n' \
-                + ', '.join(['%s: %s' % (k, v.__doc__)
-                    for (k, v) in ImageSource.SOURCES.items()]) \
-                + ' Default: %default')
 
         self.database = None
         self.parser.add_option(mountopt = 'database', metavar = 'DATABASE',
             default = self.database,
-            help = 'The database file to use. You do not need to specify ' \
-                + 'this if you are using the default database for the source.')
+            help =
+                'The database file to use. You do not need to specify this if '
+                'you are using the default database for the source.')
 
         self.photo_path = 'Photos'
         self.parser.add_option(mountopt = 'photo_path', metavar = 'PATH',
             default = self.photo_path,
-            help = 'The directory in which to place all photo tag ' \
-                + 'subdirectories. Default: %default')
+            help =
+                'The directory in which to place all photo tag '
+                'subdirectories. Default: %default')
 
         self.video_path = 'Videos'
         self.parser.add_option(mountopt = 'video_path', metavar = 'PATH',
             default = self.video_path,
-            help = 'The directory in which to place all video tag ' \
-                + 'subdirectories. Default: %default')
-
-        self.rewrite_path = None
-        self.parser.add_option(mountopt = 'rewrite_path',
-            metavar = 'SOURCE=>TARGET', default = self.rewrite_path,
-            help = 'The path rewrite rule. Specify this as source=>target. ' \
-                + 'Any path starting with source will be moved to target ' \
-                + 'when creating links.')
+            help =
+                'The directory in which to place all video tag '
+                'subdirectories. Default: %default')
 
         self.date_format = '%Y-%m-%d, %H.%M'
         self.parser.add_option(mountopt = 'date_format', metavar = 'FORMAT',
             default = self.date_format,
-            help = 'The date format to use when creating file names.\n' \
-                + 'Default: %default.')
+            help =
+                'The date format to use when creating file names. Default: '
+                '%default.')
 
         self.creation = None
         self.image_source = None
@@ -581,14 +572,6 @@ class PhotoFS(fuse.Fuse):
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
-
-            # Parse the rewrite value
-            if self.rewrite_path:
-                rewrite_path = self.rewrite_path.split('=>')
-                if len(rewrite_path) != 2:
-                    raise ValueError('%s is not a valid rewrite rule',
-                        self.rewrite_path)
-                self.rewrite_path = rewrite_path
 
         except Exception as e:
             try:
@@ -708,36 +691,6 @@ class PhotoFS(fuse.Fuse):
             except KeyError:
                 return -errno.ENOENT
 
-        def readlink(self, root, path):
-            """Returns the link target of a path.
-
-            :param str root: The first segment of the path, which contains the
-                string that caused this resolver to be picked by
-                :class:`PhotoFS`.
-
-            :param str path: The path to resolve. This has to begin with
-                :attr:`os.path.sep`, and it must resolve to an image.
-
-            :return: a :class:`fuse.Stat` object for the path, or an error code
-                otherwise
-            :rtype: fuse.Stat or int
-            """
-            self.image_source.refresh()
-            try:
-                item = self.image_source.locate(path)
-
-                if isinstance(item, Image):
-                    # This is a file
-                    return item.location
-
-                else:
-                    raise RuntimeError('Unknown object: %s',
-                        os.path.sep.join(root, path))
-
-            except KeyError:
-                return -errno.ENOENT
-
-
     def split_path(self, path):
         """Returns the tuple ``(root, rest)`` for a path, where ``root`` is the
         directory immediately beneath the root and ``rest`` is anything after
@@ -759,25 +712,6 @@ class PhotoFS(fuse.Fuse):
             return path.split(os.path.sep, 1)
         else:
             return (path, '')
-
-    def rewrite(self, source):
-        """Removes the first part of source if it is the rewrite source and
-        replaces it with the rewrite target.
-
-        This function returns ``source`` if no rewrite rule has been defined.
-
-        :param str source: The source to rewrite.
-
-        :return: ``source`` rewritten
-        :rtype: str
-        """
-        if self.rewrite_path \
-                and source.startswith(self.rewrite_path[0] + os.path.sep):
-            return os.path.sep.join((
-                self.rewrite_path[1],
-                source[len(self.rewrite_path[0]):]))
-        else:
-            return source
 
     def getattr(self, path):
         try:
@@ -834,18 +768,8 @@ class PhotoFS(fuse.Fuse):
             return -e.errno
 
     def readlink(self, path):
-        try:
-            root, rest = self.split_path(path)
-
-            # A call to readlink may only happen on an item in a resolver
-            return self.rewrite(self.resolvers[root].readlink(
-                root, os.path.sep + rest))
-
-        except KeyError:
-            return -errno.ENOENT
-
-        except OSError as e:
-            return -e.errno
+        # Links are not supported
+        return -errno.ENOENT
 
     def open(self, path, flags):
         # Get the source file; this will be an errno constant on error
