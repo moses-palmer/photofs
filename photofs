@@ -550,6 +550,7 @@ class PhotoFS(fuse.Fuse):
                 '%default.')
 
         self.creation = None
+        self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
@@ -572,6 +573,9 @@ class PhotoFS(fuse.Fuse):
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
+
+            # Use the lstat result of the database directory for all directories
+            self.dirstat = os.lstat(os.path.dirname(self.image_source.path))
 
         except Exception as e:
             try:
