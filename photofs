@@ -830,6 +830,7 @@ def main():
     photo_fs.parse(values = photo_fs, errex = 1)
 
     photo_fs.main()
+    photo_fs.sync_stop()
 
 
 if __name__ == '__main__':
