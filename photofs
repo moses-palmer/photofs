@@ -566,9 +566,9 @@ class PhotoFS(fuse.Fuse):
 
             # Load the photo and video resolvers
             self.resolvers = {
-                self.photo_path: self.ImageResolver(self.image_source,
+                self.photo_path: self.ImageResolver(self,
                     lambda i: not i.is_video),
-                self.video_path: self.ImageResolver(self.image_source,
+                self.video_path: self.ImageResolver(self,
                     lambda i: i.is_video)}
 
             # Store the current time as timestamp for directories
@@ -588,11 +588,10 @@ class PhotoFS(fuse.Fuse):
     class ImageResolver(object):
         """This class resolves image requests.
         """
-        def __init__(self, image_source, include_filter):
+        def __init__(self, file_system, include_filter):
             """Creates an image resolver for a specific source and filter.
 
-            :param ImageSource image_source: The image source from which to
-                retrieve images.
+            :param PhotoFS file_system: The photofs instance.
 
             :param include_filter: The filter function to apply to images. This
                 function will only be passed instances of :class:`Image`.
@@ -620,10 +619,10 @@ class PhotoFS(fuse.Fuse):
                 else:
                     return False
 
-            self.image_source = image_source
+            self.fs = file_system
             self._include_filter = recursive_filter
 
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
 
         def getattr(self, root, path):
             """Performs a stat on ``/root/path``.
@@ -639,9 +638,9 @@ class PhotoFS(fuse.Fuse):
                 otherwise
             :rtype: fuse.Stat or int
             """
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
             try:
-                item = self.image_source.locate(path)
+                item = self.fs.image_source.locate(path)
 
                 if isinstance(item, Image):
                     # This is a file
@@ -654,7 +653,7 @@ class PhotoFS(fuse.Fuse):
                         st_nlink = 2,
                         st_atime = int(time.time()),
                         st_mtime = int(time.time()),
-                        st_ctime = self.image_source.timestamp)
+                        st_ctime = self.fs.image_source.timestamp)
 
                 else:
                     raise RuntimeError('Unknown object: %s',
@@ -678,9 +677,9 @@ class PhotoFS(fuse.Fuse):
                 read
             :rtype: fuse.Direntry or int
             """
-            self.image_source.refresh()
+            self.fs.image_source.refresh()
             try:
-                item = self.image_source.locate(path)
+                item = self.fs.image_source.locate(path)
 
                 if isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
