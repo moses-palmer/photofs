@@ -648,12 +648,7 @@ class PhotoFS(fuse.Fuse):
 
                 elif isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
-                    return fuse.Stat(
-                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
-                        st_nlink = 2,
-                        st_atime = int(time.time()),
-                        st_mtime = int(time.time()),
-                        st_ctime = self.fs.image_source.timestamp)
+                    return self.fs.dirstat
 
                 else:
                     raise RuntimeError('Unknown object: %s',
