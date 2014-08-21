@@ -721,23 +721,7 @@ class PhotoFS(fuse.Fuse):
                 if root and not root in self.resolvers:
                     return -errno.ENOENT
                 else:
-                    return fuse.Stat(
-                        # Not used, but must be set
-                        st_dev = 0,
-                        st_blksize = 0,
-                        st_size = 0,
-                        st_blocks = 0,
-
-                        st_mode = stat.S_IFDIR | stat.S_IRUSR | stat.S_IXUSR,
-
-                        st_nlink = 2,
-
-                        st_uid = 1000,
-                        st_gid = 1000,
-
-                        st_atime = int(time.time()),
-                        st_mtime = int(time.time()),
-                        st_ctime = self.creation)
+                    return self.dirstat
 
             return self.resolvers[root].getattr(root, os.path.sep + rest)
 
