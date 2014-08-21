@@ -562,6 +562,13 @@ class PhotoFS(fuse.Fuse):
                 'file system. This option is effective only when database is '
                 'set.')
 
+        self.sync_to = None
+        self.parser.add_option(mountopt = 'sync_to', metavar = 'PATH',
+            default = self.sync_to,
+            help =
+                'A path to which to copy the database file when it is changed. '
+                'This option will override force_temporary')
+
         self.creation = None
         self.dirstat = None
         self.image_source = None
@@ -602,6 +609,12 @@ class PhotoFS(fuse.Fuse):
             except:
                 print('Failed to initialise file system: %s'
                     % str(e))
+
+        else:
+            if self.sync_to:
+                # If a sync_to argument has been provided, we make sure that
+                # file is kept up-to-date with the actual database
+                self.sync_start(self.image_source.path, self.sync_to)
 
     class ImageResolver(object):
         """This class resolves image requests.
