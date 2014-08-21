@@ -20,6 +20,7 @@ import stat
 import subprocess
 import sys
 import time
+import tempfile
 
 # For FUSE
 import errno
@@ -552,12 +553,26 @@ class PhotoFS(fuse.Fuse):
                 'The date format to use when creating file names. Default: '
                 '%default.')
 
+        self.force_temporary = False
+        self.parser.add_option(mountopt = 'force_temporary',
+            action = 'store_true',
+            help =
+                'Whether to use a temporary file as database file. This option '
+                'can be used when the database file is located on a network '
+                'file system. This option is effective only when database is '
+                'set.')
+
         self.creation = None
         self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
     def fsinit(self):
+        if self.force_temporary:
+            fd, name = tempfile.mkstemp()
+            self.sync_start(self.database, name, True)
+            self.database = name
+
         try:
             # Make sure the photo and video paths are strs
             self.photo_path = str(self.photo_path)
