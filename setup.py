@@ -8,7 +8,7 @@ import sys
 
 # Information published on PyPi
 PACKAGE_NAME = 'photofs'
-VERSION = '1.0'
+VERSION = '1.1'
 DESCRIPTION = 'Explore tagged photos from Shotwell in the filesystem using FUSE'
 AUTHOR = 'Moses Palmér'
 PACKAGE_URL = 'https://github.com/moses-palmer/photofs'
