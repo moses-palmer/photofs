@@ -1,0 +1,61 @@
+#!/bin/sh
+# photofs
+# Copyright (C) 2012-2014 Moses Palmér
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <http://www.gnu.org/licenses/>.
+
+USAGE="Usage: $0 SOURCE TARGET
+
+This program will make sure that any time SOURCE is changed, TARGET is
+overwritten with the contents of SOURCE."
+
+SOURCE="$1"
+TARGET="$2"
+CLEANUP="$3"
+WAIT_COMMAND=inotifywait
+
+
+# Verify arguments
+if [ -z "$SOURCE" -o -z "$TARGET" ]; then
+    echo "$USAGE"
+    exit 1
+fi
+
+if [ ! -f "$SOURCE" ]; then
+    echo "$SOURCE does not exist"
+    exit 2
+fi
+
+if [ -z "$(which $WAIT_COMMAND)" ]; then
+    echo "$WAIT_COMMAND is not available on this system"
+    exit 3
+fi
+
+if [ "x$CLEANUP" = "xcleanup" ]; then
+    trap "rm -f \"$TARGET\" && exit" HUP INT TERM
+fi
+
+
+# Copy the source to the target file and then print a line to stdout to allow
+# the caller to wait until the target has been updated
+cp -a "$SOURCE" "$TARGET"
+echo "Starting..."
+
+
+# Copy the source file when changed until the end of time
+while true; do
+    if $WAIT_COMMAND -e modify "$SOURCE"; then
+        echo "cp -a \"$SOURCE\" \"$TARGET\""
+        cp -a "$SOURCE" "$TARGET"
+    fi
+done

@@ -44,7 +44,8 @@ def setup(**kwargs):
         url = PACKAGE_URL,
 
         scripts = [
-            'photofs'],
+            'photofs',
+            'photofs-sync-db'],
         zip_safe = True,
 
         license = 'GPLv3',
