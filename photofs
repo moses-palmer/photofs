@@ -545,48 +545,11 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.source = ImageSource.SOURCES.keys()[0]
 
         self.database = None
-        self.parser.add_option(mountopt = 'database', metavar = 'DATABASE',
-            default = self.database,
-            help =
-                'The database file to use. You do not need to specify this if '
-                'you are using the default database for the source.')
-
         self.photo_path = 'Photos'
-        self.parser.add_option(mountopt = 'photo_path', metavar = 'PATH',
-            default = self.photo_path,
-            help =
-                'The directory in which to place all photo tag '
-                'subdirectories. Default: %default')
-
         self.video_path = 'Videos'
-        self.parser.add_option(mountopt = 'video_path', metavar = 'PATH',
-            default = self.video_path,
-            help =
-                'The directory in which to place all video tag '
-                'subdirectories. Default: %default')
-
         self.date_format = '%Y-%m-%d, %H.%M'
-        self.parser.add_option(mountopt = 'date_format', metavar = 'FORMAT',
-            default = self.date_format,
-            help =
-                'The date format to use when creating file names. Default: '
-                '%default.')
-
         self.force_temporary = False
-        self.parser.add_option(mountopt = 'force_temporary',
-            action = 'store_true',
-            help =
-                'Whether to use a temporary file as database file. This option '
-                'can be used when the database file is located on a network '
-                'file system. This option is effective only when database is '
-                'set.')
-
         self.sync_to = None
-        self.parser.add_option(mountopt = 'sync_to', metavar = 'PATH',
-            default = self.sync_to,
-            help =
-                'A path to which to copy the database file when it is changed. '
-                'This option will override force_temporary')
 
         self.creation = None
         self.dirstat = None
