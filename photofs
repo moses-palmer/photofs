@@ -531,7 +531,7 @@ class ShotwellSource(ImageSource):
             db.close()
 
 
-class PhotoFS(fuse.Fuse):
+class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     """An implementation of a *FUSE* file system.
 
     It presents the tagged image libraries from image sources as a tag tree in
