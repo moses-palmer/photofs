@@ -25,7 +25,6 @@ import tempfile
 # For FUSE
 import errno
 import fuse
-fuse.fuse_python_api = (0, 2)
 
 # For guessing whether a file is an image or a video when the source does not
 # know

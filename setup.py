@@ -38,7 +38,7 @@ def setup(**kwargs):
         long_description = README + '\n\n' + CHANGES,
 
         install_requires = [
-            'fuse-python >=0.2'],
+            'fusepy >=2.0.2'],
         setup_requires = [],
 
         url = PACKAGE_URL,
