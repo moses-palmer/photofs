@@ -536,27 +536,55 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
     It presents the tagged image libraries from image sources as a tag tree in
     the file system.
+
+    :param ImageSource source: The image source.
+
+    :param database: An override for the default database file for the
+        selected image source.
+    :type database: str or None
+
+    :param str photo_path: The directory in the mounted root to contain photos.
+
+    :param str video_path: The directory in the mounted root to contain videos.
+
+    :param str date_format: The date format string used to construct file names
+        from time stamps.
+
+    :param bool force_temporary: Whether to force the actual database file used
+        to be a temporary file, and copy the content of ``database`` to this
+        file.
+
+    :param sync_to: A file to which to copy the database used when changes are
+        detected.
+    :type sync_to: str or None
+
+    :raises RuntimeError: if an error occurs
     """
-    def __init__(self):
+    def __init__(self,
+            source = list(ImageSource.SOURCES.keys())[0],
+            database = None,
+            photo_path = 'Photos',
+            video_path = 'Videos',
+            date_format = '%Y-%m-%d, %H.%M',
+            force_temporary = False,
+            sync_to = None):
         super(PhotoFS, self).__init__()
 
         self._sync = None
 
-        self.source = ImageSource.SOURCES.keys()[0]
-
-        self.database = None
-        self.photo_path = 'Photos'
-        self.video_path = 'Videos'
-        self.date_format = '%Y-%m-%d, %H.%M'
-        self.force_temporary = False
-        self.sync_to = None
+        self.source = source
+        self.database = database
+        self.photo_path = photo_path
+        self.video_path = video_path
+        self.date_format = date_format
+        self.force_temporary = force_temporary
+        self.sync_to = sync_to
 
         self.creation = None
         self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
-    def fsinit(self):
         if self.force_temporary:
             fd, name = tempfile.mkstemp()
             self.sync_start(self.database, name, True)
@@ -590,11 +618,11 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
         except Exception as e:
             try:
-                print('Failed to initialise file system: %s'
-                    % e.args[0] % e.args[1:])
+                raise RuntimeError('Failed to initialise file system: %s',
+                    e.args[0] % e.args[1:])
             except:
-                print('Failed to initialise file system: %s'
-                    % str(e))
+                raise RuntimeError('Failed to initialise file system: %s',
+                    str(e))
 
         else:
             if self.sync_to:
