@@ -31,7 +31,6 @@ fuse.fuse_python_api = (0, 2)
 # know
 import mimetypes
 
-from urllib2 import urlparse
 from xdg.BaseDirectory import xdg_config_dirs, xdg_data_dirs
 
 
