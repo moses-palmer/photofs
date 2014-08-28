@@ -882,7 +882,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         # Return a file object
         return open(source_or_error, 'rb')
 
-    def release(self, path, flags, fh):
+    def release(self, path, fh):
         try:
             fh.close()
         except:
