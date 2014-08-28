@@ -450,8 +450,10 @@ class ShotwellSource(ImageSource):
                         r_title = time.strftime(self._date_format,
                             time.localtime(r_exposure_time))
 
-                    images[r_id] = Image(r_filename.encode('utf-8'),
-                        int(r_exposure_time), r_title.encode('utf-8'),
+                    images[r_id] = Image(
+                        r_filename,
+                        int(r_exposure_time),
+                        r_title,
                         is_video)
 
             # Load the tags
@@ -469,7 +471,7 @@ class ShotwellSource(ImageSource):
                 path_name = os.path.sep.join(path)
 
                 # Make sure that the tag and all its parents exist
-                tag = self._make_tags(path_name.encode('utf-8'))
+                tag = self._make_tags(path_name)
 
                 # The IDs are all in the text of photo_id_list, separated by
                 # commas; there is an extra comma at the end
