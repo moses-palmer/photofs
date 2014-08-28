@@ -829,8 +829,30 @@ class PhotoFS(fuse.Fuse):
             return -e.errno
 
     def readlink(self, path):
-        # Links are not supported
-        return -errno.ENOENT
+        self.image_source.refresh()
+        try:
+            root, rest = self.split_path(path)
+
+            # A call to readlink may only happen on an item in a resolver
+            try:
+                item = self.image_source.locate(os.path.sep + rest)
+
+                if isinstance(item, Image):
+                    # This is a file
+                    return item.location
+
+                else:
+                    raise RuntimeError('Unknown object: %s',
+                        os.path.sep.join(root, path))
+
+            except KeyError:
+                return -errno.ENOENT
+
+        except KeyError:
+            return -errno.ENOENT
+
+        except OSError as e:
+            return -e.errno
 
     def open(self, path, flags):
         # Get the source file; this will be an errno constant on error
