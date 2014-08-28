@@ -655,6 +655,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             :return: a :class:`os.stat_result` object for the path
             :rtype: os.stat_result
+
+            :raises fuse.FuseOSError: if an error occurs
             """
             self.fs.image_source.refresh()
             try:
@@ -673,7 +675,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                         os.path.sep.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
         def readdir(self, root, path):
             """Performs a directory listing on ``/root/path``.
@@ -686,9 +688,10 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 :attr:`os.path.sep`, and it must be resolved to a dictionary.
 
             :return: a sequence of :class:`fuse.Direntry` instances describing
-                the directory, or an error code if the directory could not be
-                read
-            :rtype: fuse.Direntry or int
+                the directory
+            :rtype: fuse.Direntry
+
+            :raises fuse.FuseOSError: if an error occurs
             """
             self.fs.image_source.refresh()
             try:
@@ -705,7 +708,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                         os.path.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
     def sync_stop(self):
         """Stops the external process responsible for syncing the database
@@ -786,17 +789,17 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 # Unless path is the root, it must be in the resolvers; the root
                 # and any items directly below it are directories
                 if root and not root in self.resolvers:
-                    return -errno.ENOENT
+                    raise fuse.FuseOSError(errno.ENOENT)
                 else:
                     return self.dirstat
 
             return self.resolvers[root].getattr(root, os.path.sep + rest)
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
 
     def readdir(self, path, offset):
@@ -811,10 +814,10 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             return self.resolvers[root].readdir(root, os.path.sep + rest)
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
     def readlink(self, path):
         self.image_source.refresh()
@@ -834,19 +837,19 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                         os.path.sep.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
     def open(self, path, flags):
         # Get the source file; this will be an errno constant on error
         source_or_error = self.readlink(path)
         if isinstance(source_or_error, int):
-            return source_or_error
+            raise fuse.FuseOSError(source_or_error)
 
         # Return a file object
         return open(source_or_error, 'rb')
@@ -855,7 +858,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         try:
             fh.close()
         except:
-            return -errno.EINVAL
+            raise fuse.FuseOSError(errno.EINVAL)
 
     def read(self, path, size, offset, fh):
         fh.seek(offset)
