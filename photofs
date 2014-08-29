@@ -893,23 +893,17 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             raise fuse.FuseOSError(e.errno)
 
     def open(self, path, flags):
-        # Get the source file; this will be an errno constant on error
-        source_or_error = self.readlink(path)
-        if isinstance(source_or_error, int):
-            raise fuse.FuseOSError(source_or_error)
-
-        # Return a file object
-        return open(source_or_error, 'rb')
+        return os.open(self.readlink(path), flags)
 
     def release(self, path, fh):
         try:
-            fh.close()
+            os.close(fh)
         except:
             raise fuse.FuseOSError(errno.EINVAL)
 
     def read(self, path, size, offset, fh):
-        fh.seek(offset)
-        return fh.read(size)
+        os.lseek(fh, offset, 0)
+        return os.read(fh, size)
 
 
 def main():
