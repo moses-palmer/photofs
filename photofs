@@ -850,10 +850,15 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             if not root:
                 # The root contains the resolver names
-                return [fuse.Direntry(d)
-                    for d in ['.', '..'] + self.resolvers.keys()]
+                items = [d
+                    for d in self.resolvers.keys()]
+            else:
+                items = self.resolvers[root].readdir(root, os.path.sep + rest)
 
-            return self.resolvers[root].readdir(root, os.path.sep + rest)
+            # We return tuples instead of strings since fusepy on Python 2.x
+            # incorrectly treats unicode as non-string
+            return [(i, None, 0)
+                for i in items]
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
