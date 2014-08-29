@@ -664,9 +664,8 @@ class PhotoFS(fuse.Fuse):
             :param str path: The path to resolve. This has to begin with
                 :attr:`os.path.sep`.
 
-            :return: a :class:`fuse.Stat` object for the path, or an error code
-                otherwise
-            :rtype: fuse.Stat or int
+            :return: a :class:`os.stat_result` object for the path
+            :rtype: os.stat_result
             """
             self.fs.image_source.refresh()
             try:
