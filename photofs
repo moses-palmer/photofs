@@ -630,6 +630,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 # file is kept up-to-date with the actual database
                 self.sync_start(self.image_source.path, self.sync_to)
 
+    def destroy(self, path):
+        self.sync_stop()
+
     class ImageResolver(object):
         """This class resolves image requests.
         """
