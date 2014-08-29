@@ -177,6 +177,9 @@ class Tag(dict):
         if parent:
             parent.add(self)
 
+        self._has_video = False
+        self._has_image = False
+
     @property
     def name(self):
         """The name of this tag."""
@@ -192,6 +195,16 @@ class Tag(dict):
     def parent(self):
         """The parent of this tag."""
         return self._parent
+
+    @property
+    def has_image(self):
+        """Whether this tag contains at least one image"""
+        return self._has_image
+
+    @property
+    def has_video(self):
+        """Whether this tag contains at least one video"""
+        return self._has_video
 
     def add(self, item):
         """Adds an image or tag to this tag.
@@ -217,6 +230,9 @@ class Tag(dict):
             key = self._make_unique(item.title, ext.lower())
             self[key] = item
 
+            self._has_image = self._has_image or not item.is_video
+            self._has_video = self._has_image or item.is_video
+
         elif isinstance(item, Tag):
             previous = self.get(item.name)
             self[item.name] = item
@@ -224,6 +240,9 @@ class Tag(dict):
             # Re-add the previous item if it was an image
             if isinstance(previous, Image):
                 self.add(previous)
+
+            self._has_image = self._has_image or item.has_video
+            self._has_video = self._has_image or item.has_image
 
         else:
             raise ValueError('Cannot add %s to a Tag',
@@ -593,9 +612,13 @@ class PhotoFS(fuse.Fuse):
             # Load the photo and video resolvers
             self.resolvers = {
                 self.photo_path: self.ImageResolver(self,
-                    lambda i: not i.is_video),
+                    lambda i: not i.is_video
+                        if isinstance(i, Image)
+                        else not i.has_video),
                 self.video_path: self.ImageResolver(self,
-                    lambda i: i.is_video)}
+                    lambda i: i.is_video
+                        if isinstance(i, Image)
+                        else i.has_video)}
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
@@ -648,7 +671,8 @@ class PhotoFS(fuse.Fuse):
                 if isinstance(item, Image):
                     return include_filter(item)
                 elif isinstance(item, Tag):
-                    return len(filter(recursive_filter, item.values())) > 0
+                    return any(recursive_filter(item)
+                        for item in item.values())
                 else:
                     return False
 
