@@ -629,7 +629,8 @@ class PhotoFS(fuse.Fuse):
                 subtags will automatically be filtered out.
             """
             def recursive_filter(item):
-                """The recursive filter used to actually filter the image source.
+                """The recursive filter used to actually filter the image
+                source.
 
                 This function will simply call include_filter in the outer scope
                 if item is an instance of :class:`Image`, otherwise it will
