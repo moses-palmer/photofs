@@ -715,9 +715,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             :param str path: The path to resolve. This has to begin with
                 :attr:`os.path.sep`, and it must be resolved to a dictionary.
 
-            :return: a sequence of :class:`fuse.Direntry` instances describing
-                the directory
-            :rtype: fuse.Direntry
+            :return: a sequence of strings describing the directory
+            :rtype: [str]
 
             :raises fuse.FuseOSError: if an error occurs
             """
@@ -727,9 +726,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
                 if isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
-                    return [fuse.Direntry(d)
-                        for d in ['.', '..'] + [k for k, v in item.items()
-                            if self._include_filter(v)]]
+                    return [k
+                        for k, v in item.items()
+                        if self._include_filter(v)]
 
                 else:
                     raise RuntimeError('Unknown object: %s',
