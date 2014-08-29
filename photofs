@@ -863,11 +863,15 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
 
 def main():
-    photo_fs = PhotoFS()
-    photo_fs.parse(values = photo_fs, errex = 1)
-
-    photo_fs.main()
-    photo_fs.sync_stop()
+    try:
+        photo_fs = PhotoFS()
+        fuse.FUSE(photo_fs, sys.argv[1], fsname = 'photofs')
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        try:
+            sys.stderr.write('%s\n' % e.args[0] % e.args[1:])
+        except:
+            sys.stderr.write('%s\n' % str(e))
 
 
 if __name__ == '__main__':
