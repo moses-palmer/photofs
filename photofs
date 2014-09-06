@@ -31,7 +31,6 @@ fuse.fuse_python_api = (0, 2)
 # know
 import mimetypes
 
-from urllib2 import urlparse
 from xdg.BaseDirectory import xdg_config_dirs, xdg_data_dirs
 
 
@@ -178,6 +177,9 @@ class Tag(dict):
         if parent:
             parent.add(self)
 
+        self._has_video = False
+        self._has_image = False
+
     @property
     def name(self):
         """The name of this tag."""
@@ -193,6 +195,16 @@ class Tag(dict):
     def parent(self):
         """The parent of this tag."""
         return self._parent
+
+    @property
+    def has_image(self):
+        """Whether this tag contains at least one image"""
+        return self._has_image
+
+    @property
+    def has_video(self):
+        """Whether this tag contains at least one video"""
+        return self._has_video
 
     def add(self, item):
         """Adds an image or tag to this tag.
@@ -218,6 +230,9 @@ class Tag(dict):
             key = self._make_unique(item.title, ext.lower())
             self[key] = item
 
+            self._has_image = self._has_image or not item.is_video
+            self._has_video = self._has_image or item.is_video
+
         elif isinstance(item, Tag):
             previous = self.get(item.name)
             self[item.name] = item
@@ -225,6 +240,9 @@ class Tag(dict):
             # Re-add the previous item if it was an image
             if isinstance(previous, Image):
                 self.add(previous)
+
+            self._has_image = self._has_image or item.has_video
+            self._has_video = self._has_image or item.has_image
 
         else:
             raise ValueError('Cannot add %s to a Tag',
@@ -451,8 +469,10 @@ class ShotwellSource(ImageSource):
                         r_title = time.strftime(self._date_format,
                             time.localtime(r_exposure_time))
 
-                    images[r_id] = Image(r_filename.encode('utf-8'),
-                        int(r_exposure_time), r_title.encode('utf-8'),
+                    images[r_id] = Image(
+                        r_filename,
+                        int(r_exposure_time),
+                        r_title,
                         is_video)
 
             # Load the tags
@@ -470,7 +490,7 @@ class ShotwellSource(ImageSource):
                 path_name = os.path.sep.join(path)
 
                 # Make sure that the tag and all its parents exist
-                tag = self._make_tags(path_name.encode('utf-8'))
+                tag = self._make_tags(path_name)
 
                 # The IDs are all in the text of photo_id_list, separated by
                 # commas; there is an extra comma at the end
@@ -592,9 +612,13 @@ class PhotoFS(fuse.Fuse):
             # Load the photo and video resolvers
             self.resolvers = {
                 self.photo_path: self.ImageResolver(self,
-                    lambda i: not i.is_video),
+                    lambda i: not i.is_video
+                        if isinstance(i, Image)
+                        else not i.has_video),
                 self.video_path: self.ImageResolver(self,
-                    lambda i: i.is_video)}
+                    lambda i: i.is_video
+                        if isinstance(i, Image)
+                        else i.has_video)}
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
@@ -630,7 +654,8 @@ class PhotoFS(fuse.Fuse):
                 subtags will automatically be filtered out.
             """
             def recursive_filter(item):
-                """The recursive filter used to actually filter the image source.
+                """The recursive filter used to actually filter the image
+                source.
 
                 This function will simply call include_filter in the outer scope
                 if item is an instance of :class:`Image`, otherwise it will
@@ -646,7 +671,8 @@ class PhotoFS(fuse.Fuse):
                 if isinstance(item, Image):
                     return include_filter(item)
                 elif isinstance(item, Tag):
-                    return len(filter(recursive_filter, item.values())) > 0
+                    return any(recursive_filter(item)
+                        for item in item.values())
                 else:
                     return False
 
@@ -665,9 +691,8 @@ class PhotoFS(fuse.Fuse):
             :param str path: The path to resolve. This has to begin with
                 :attr:`os.path.sep`.
 
-            :return: a :class:`fuse.Stat` object for the path, or an error code
-                otherwise
-            :rtype: fuse.Stat or int
+            :return: a :class:`os.stat_result` object for the path
+            :rtype: os.stat_result
             """
             self.fs.image_source.refresh()
             try:
@@ -830,8 +855,30 @@ class PhotoFS(fuse.Fuse):
             return -e.errno
 
     def readlink(self, path):
-        # Links are not supported
-        return -errno.ENOENT
+        self.image_source.refresh()
+        try:
+            root, rest = self.split_path(path)
+
+            # A call to readlink may only happen on an item in a resolver
+            try:
+                item = self.image_source.locate(os.path.sep + rest)
+
+                if isinstance(item, Image):
+                    # This is a file
+                    return item.location
+
+                else:
+                    raise RuntimeError('Unknown object: %s',
+                        os.path.sep.join(root, path))
+
+            except KeyError:
+                return -errno.ENOENT
+
+        except KeyError:
+            return -errno.ENOENT
+
+        except OSError as e:
+            return -e.errno
 
     def open(self, path, flags):
         # Get the source file; this will be an errno constant on error
@@ -863,4 +910,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
