@@ -268,6 +268,21 @@ class ImageSource(dict):
             return cls
         return inner
 
+    @classmethod
+    def get(self, name):
+        """Returns the class responsible for a named image source.
+
+        :param str name: The name of the source.
+
+        :return: the corresponding class
+
+        :raises ValueError: if ``name`` is not a known image source
+        """
+        try:
+            return self.SOURCES[name]
+        except KeyError:
+            raise ValueError('%s is not a valid image source', name)
+
     def _default_location(self):
         """Returns the default location of the backend resource.
 
@@ -590,14 +605,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             self.sync_start(self.database, name, True)
             self.database = name
 
+        # Create the image source
+        self.image_source = ImageSource.get(self.source)(
+            self.database, self.date_format)
+
         try:
             # Make sure the photo and video paths are strs
             self.photo_path = str(self.photo_path)
             self.video_path = str(self.video_path)
-
-            # Create the image source
-            self.image_source = ImageSource.SOURCES[self.source](
-                self.database, self.date_format)
 
             # Load the photo and video resolvers
             self.resolvers = {
