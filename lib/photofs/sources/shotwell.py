@@ -21,10 +21,22 @@ from xdg.BaseDirectory import xdg_data_dirs
 from .. import *
 
 
+# Try to import sqlite
+try:
+    import sqlite3
+except ImportError:
+    sqlite = None
+
+
 @ImageSource.register('shotwell')
 class ShotwellSource(FileBasedImageSource):
     """Loads images and videos from Shotwell.
     """
+    def __init__(self, *args, **kwargs):
+        if sqlite3 is None:
+            raise RuntimeError('This program requires sqlite3')
+        super(ShotwellSource, self).__init__(*args, **kwargs)
+
     @property
     def default_location(self):
         """Determines the location of the *Shotwell* database.

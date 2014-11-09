@@ -29,14 +29,6 @@ import fuse
 import mimetypes
 
 
-# Give the user a warning if sqlite cannot be imported
-try:
-    import sqlite3
-except ImportError:
-    print('This program requires sqlite3')
-    sys.exit(1)
-
-
 def make_unique(mapping, base_name, format_1, format_n, *args):
     """Creates a unique key in a ``dict``.
 
