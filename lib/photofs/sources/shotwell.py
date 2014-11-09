@@ -25,7 +25,8 @@ from .. import *
 class ShotwellSource(FileBasedImageSource):
     """Loads images and videos from Shotwell.
     """
-    def _default_location(self):
+    @property
+    def default_location(self):
         """Determines the location of the *Shotwell* database.
 
         :return: the location of the database, or ``None`` if it cannot be

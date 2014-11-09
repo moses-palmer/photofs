@@ -380,15 +380,6 @@ class FileBasedImageSource(ImageSource):
 
     This is an abstract class.
     """
-    def _default_location(self):
-        """Returns the default location of the backend resource.
-
-        :return: the default location of the backend resource, or ``None`` if
-            none exists
-        :rtype: str or None
-        """
-        raise NotImplementedError()
-
     def __init__(self, database = None, **kwargs):
         """Creates a new ImageSource.
 
@@ -399,7 +390,7 @@ class FileBasedImageSource(ImageSource):
             default location is used.
         """
         super(FileBasedImageSource, self).__init__(**kwargs)
-        self._path = database or self._default_location()
+        self._path = database or self.default_location
         if self._path is None:
             raise ValueError('No database')
         self._timestamp = 0
@@ -412,6 +403,16 @@ class FileBasedImageSource(ImageSource):
 
         :return: a list of tags with the images attached
         :rtype: [Tag]
+        """
+        raise NotImplementedError()
+
+    @property
+    def default_location(self):
+        """Returns the default location of the backend resource.
+
+        :return: the default location of the backend resource, or ``None`` if
+            none exists
+        :rtype: str or None
         """
         raise NotImplementedError()
 
