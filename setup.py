@@ -27,7 +27,6 @@ with open(os.path.join(
         'CHANGES.rst')) as f:
     CHANGES = f.read()
 
-SCRIPTS = ['photofs']
 
 # The author email
 AUTHOR_EMAIL = 'moses.palmer@gmail.com'
