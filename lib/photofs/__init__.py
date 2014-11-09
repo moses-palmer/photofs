@@ -28,8 +28,6 @@ import fuse
 # know
 import mimetypes
 
-from xdg.BaseDirectory import xdg_config_dirs, xdg_data_dirs
-
 
 # Give the user a warning if sqlite cannot be imported
 try:
@@ -438,104 +436,8 @@ class ImageSource(dict):
         return current
 
 
-@ImageSource.register('shotwell')
-class ShotwellSource(ImageSource):
-    """Loads images and videos from Shotwell.
-    """
-    def _default_location(self):
-        """Determines the location of the *Shotwell* database.
-
-        :return: the location of the database, or ``None`` if it cannot be
-            located
-        :rtype: str or None
-        """
-        for d in xdg_data_dirs:
-            result = os.path.join(d, 'shotwell', 'data', 'photo.db')
-            if os.access(result, os.R_OK):
-                return result
-
-    def _load_tags(self):
-        db = sqlite3.connect(self._path)
-        try:
-            # The descriptions of the different image tables; the value tuple is
-            # the header of the ID in the tag table, the map of IDs to images
-            # and whether the table contains videos
-            db_tables = {
-                'phototable': ('thumb', {}, False),
-                'videotable': ('video-', {}, True)}
-
-            # Load the images
-            for table_name, (header, images, is_video) in db_tables.items():
-                results = db.execute("""
-                    SELECT id, filename, exposure_time, title
-                        FROM %s""" % table_name)
-                for r_id, r_filename, r_exposure_time, r_title in results:
-                    # Make sure the title is set to a reasonable value
-                    if not r_title:
-                        r_title = time.strftime(self._date_format,
-                            time.localtime(r_exposure_time))
-
-                    images[r_id] = Image(
-                        r_filename,
-                        int(r_exposure_time),
-                        r_title,
-                        is_video)
-
-            # Load the tags
-            results = db.execute("""
-                SELECT name, photo_id_list
-                    FROM tagtable
-                    ORDER BY name""")
-            for r_name, r_photo_id_list in results:
-                # Ignore unused tags
-                if not r_photo_id_list:
-                    continue
-
-                # Hierachial tag names start with '/'
-                path = r_name.split('/') if r_name[0] == '/' else ['', r_name]
-                path_name = os.path.sep.join(path)
-
-                # Make sure that the tag and all its parents exist
-                tag = self._make_tags(path_name)
-
-                # The IDs are all in the text of photo_id_list, separated by
-                # commas; there is an extra comma at the end
-                ids = r_photo_id_list.split(',')[:-1]
-
-                # Iterate over all image IDs and move them to this tag
-                for i in ids:
-                    if i[0].isdigit():
-                        # If the first character is a digit, this is a legacy
-                        # source ID and an ID in the photo table
-                        image = db_tables['phototable'][1].get(int(i))
-                    else:
-                        # Iterate over all database tables and locate the image
-                        # instance for the current ID
-                        image = None
-                        for table_name, (header, images, is_video) \
-                                in db_tables.items():
-                            if not i.startswith(header):
-                                continue
-                            image = images.get(int(i[len(header):], 16))
-                            break
-
-                    # Verify that the tag only references existing images
-                    if image is None:
-                        continue
-
-                    # Remove the image from the parent tags
-                    parent = tag.parent
-                    while parent:
-                        for k, v in parent.items():
-                            if v == image:
-                                del parent[k]
-                        parent = parent.parent
-
-                    # Finally add the image to this tag
-                    tag.add(image)
-
-        finally:
-            db.close()
+# Import the actual image sources
+from .sources import *
 
 
 class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
