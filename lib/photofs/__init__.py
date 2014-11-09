@@ -20,7 +20,6 @@ import stat
 import subprocess
 import sys
 import time
-import tempfile
 
 # For FUSE
 import errno
@@ -565,10 +564,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     :param str date_format: The date format string used to construct file names
         from time stamps.
 
-    :param bool force_temporary: Whether to force the actual database file used
-        to be a temporary file, and copy the content of ``database`` to this
-        file.
-
     :param sync_to: A file to which to copy the database used when changes are
         detected.
     :type sync_to: str or None
@@ -581,7 +576,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             photo_path = 'Photos',
             video_path = 'Videos',
             date_format = '%Y-%m-%d, %H.%M',
-            force_temporary = False,
             sync_to = None):
         super(PhotoFS, self).__init__()
 
@@ -592,18 +586,12 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.photo_path = photo_path
         self.video_path = video_path
         self.date_format = date_format
-        self.force_temporary = force_temporary
         self.sync_to = sync_to
 
         self.creation = None
         self.dirstat = None
         self.image_source = None
         self.resolvers = {}
-
-        if self.force_temporary:
-            fd, name = tempfile.mkstemp()
-            self.sync_start(self.database, name, True)
-            self.database = name
 
         # Create the image source
         self.image_source = ImageSource.get(self.source)(

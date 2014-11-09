@@ -46,7 +46,6 @@ def main():
             'photo_path',
             'video_path',
             'date_format',
-            'force_temporary',
             'sync_to')
         if not args.get(name, None) is None}
 
