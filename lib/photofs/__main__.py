@@ -45,8 +45,7 @@ def main():
             'database',
             'photo_path',
             'video_path',
-            'date_format',
-            'sync_to')
+            'date_format')
         if not args.get(name, None) is None}
 
     # Then copy all non-None values and pass them to the FUSE constructor

@@ -564,10 +564,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     :param str date_format: The date format string used to construct file names
         from time stamps.
 
-    :param sync_to: A file to which to copy the database used when changes are
-        detected.
-    :type sync_to: str or None
-
     :raises RuntimeError: if an error occurs
     """
     def __init__(self,
@@ -575,8 +571,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             database = None,
             photo_path = 'Photos',
             video_path = 'Videos',
-            date_format = '%Y-%m-%d, %H.%M',
-            sync_to = None):
+            date_format = '%Y-%m-%d, %H.%M'):
         super(PhotoFS, self).__init__()
 
         self._sync = None
@@ -586,7 +581,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.photo_path = photo_path
         self.video_path = video_path
         self.date_format = date_format
-        self.sync_to = sync_to
 
         self.creation = None
         self.dirstat = None
@@ -626,12 +620,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             except:
                 raise RuntimeError('Failed to initialise file system: %s',
                     str(e))
-
-        else:
-            if self.sync_to:
-                # If a sync_to argument has been provided, we make sure that
-                # file is kept up-to-date with the actual database
-                self.sync_start(self.image_source.path, self.sync_to)
 
     def destroy(self, path):
         self.sync_stop()
