@@ -282,17 +282,6 @@ class ImageSource(dict):
         """
         raise NotImplementedError()
 
-    def _load_tags(self):
-        """Loads the tags from the backend resource.
-
-        This function is called by refresh if the timestamp of the backend
-        resource has changed.
-
-        :return: a list of tags with the images attached
-        :rtype: [Tag]
-        """
-        raise NotImplementedError()
-
     def _break_path(self, path):
         """Breaks an absolute path into its segments.
 
@@ -391,6 +380,17 @@ class ImageSource(dict):
         """The timestamp when the backend resource was last modified."""
         return self._timestamp
 
+    def load_tags(self):
+        """Loads the tags from the backend resource.
+
+        This function is called by refresh if the timestamp of the backend
+        resource has changed.
+
+        :return: a list of tags with the images attached
+        :rtype: [Tag]
+        """
+        raise NotImplementedError()
+
     def refresh(self):
         """Reloads all images and tags from the backend resource if it has
         changed since the last update.
@@ -398,7 +398,7 @@ class ImageSource(dict):
         If the last modification time of :attr:`path` has changed, the backend
         resource is considered to be changed as well.
 
-        In this case, the internal timestamp is updated and :meth:`_load_tags`
+        In this case, the internal timestamp is updated and :meth:`load_tags`
         is called.
         """
         # Check the timestamp
@@ -410,7 +410,7 @@ class ImageSource(dict):
 
         # Release the old data and reload the tags
         self.clear()
-        self._load_tags()
+        self.load_tags()
 
     def locate(self, path):
         """Locates an image or tag.

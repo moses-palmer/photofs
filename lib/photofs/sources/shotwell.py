@@ -37,7 +37,7 @@ class ShotwellSource(ImageSource):
             if os.access(result, os.R_OK):
                 return result
 
-    def _load_tags(self):
+    def load_tags(self):
         db = sqlite3.connect(self._path)
         try:
             # The descriptions of the different image tables; the value tuple is
