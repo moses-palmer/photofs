@@ -6,6 +6,12 @@ import setuptools
 import sys
 
 
+LIB_DIR = os.path.join(
+    os.path.dirname(__file__),
+    'lib')
+sys.path.append(LIB_DIR)
+
+
 # Information published on PyPi
 PACKAGE_NAME = 'photofs'
 VERSION = '1.1'
@@ -44,8 +50,9 @@ def setup(**kwargs):
         url = PACKAGE_URL,
 
         scripts = [
-            'photofs',
             'photofs-sync-db'],
+        packages = setuptools.find_packages(LIB_DIR),
+        package_dir = {'': LIB_DIR},
         zip_safe = True,
 
         license = 'GPLv3',
