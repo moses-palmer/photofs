@@ -273,15 +273,6 @@ class ImageSource(dict):
         except KeyError:
             raise ValueError('%s is not a valid image source', name)
 
-    def _default_location(self):
-        """Returns the default location of the backend resource.
-
-        :return: the default location of the backend resource, or ``None`` if
-            none exists
-        :rtype: str or None
-        """
-        raise NotImplementedError()
-
     def _break_path(self, path):
         """Breaks an absolute path into its segments.
 
@@ -351,66 +342,14 @@ class ImageSource(dict):
 
         return current
 
-    def __init__(self, path = None, date_format = '%Y-%m-%d, %H.%M', **kwargs):
+    def __init__(self, date_format = '%Y-%m-%d, %H.%M', **kwargs):
         """Creates a new ImageSource.
-
-        :param str path: The path to the backend database or directory for this
-            image source. If :meth:`refresh` is not overloaded, this must be a
-            valid file name. Its timestamp is used to determine whether to
-            actually reload all images and tags. If this is not provided, a
-            default location is used.
 
         :param str date_format: The date format to use when creating file names
             for images that do not have a title.
         """
         super(ImageSource, self).__init__()
-        self._path = path or self._default_location()
-        if self._path is None:
-            raise ValueError('No database')
         self._date_format = date_format
-        self._timestamp = 0
-
-    @property
-    def path(self):
-        """The path of the backend resource containing the images and tags."""
-        return self._path
-
-    @property
-    def timestamp(self):
-        """The timestamp when the backend resource was last modified."""
-        return self._timestamp
-
-    def load_tags(self):
-        """Loads the tags from the backend resource.
-
-        This function is called by refresh if the timestamp of the backend
-        resource has changed.
-
-        :return: a list of tags with the images attached
-        :rtype: [Tag]
-        """
-        raise NotImplementedError()
-
-    def refresh(self):
-        """Reloads all images and tags from the backend resource if it has
-        changed since the last update.
-
-        If the last modification time of :attr:`path` has changed, the backend
-        resource is considered to be changed as well.
-
-        In this case, the internal timestamp is updated and :meth:`load_tags`
-        is called.
-        """
-        # Check the timestamp
-        if self._path:
-            timestamp = os.stat(self._path).st_mtime
-            if timestamp == self._timestamp:
-                return
-            self._timestamp = timestamp
-
-        # Release the old data and reload the tags
-        self.clear()
-        self.load_tags()
 
     def locate(self, path):
         """Locates an image or tag.
@@ -434,6 +373,82 @@ class ImageSource(dict):
             current = current[segment]
 
         return current
+
+
+class FileBasedImageSource(ImageSource):
+    """A source of images and tags where the backend is file based.
+
+    This is an abstract class.
+    """
+    def _default_location(self):
+        """Returns the default location of the backend resource.
+
+        :return: the default location of the backend resource, or ``None`` if
+            none exists
+        :rtype: str or None
+        """
+        raise NotImplementedError()
+
+    def __init__(self, database = None, **kwargs):
+        """Creates a new ImageSource.
+
+        :param str database: The path to the backend database or directory for
+            this image source. If :meth:`refresh` is not overloaded, this must
+            be a valid file name. Its timestamp is used to determine whether to
+            actually reload all images and tags. If this is not provided, a
+            default location is used.
+        """
+        super(FileBasedImageSource, self).__init__(**kwargs)
+        self._path = database or self._default_location()
+        if self._path is None:
+            raise ValueError('No database')
+        self._timestamp = 0
+
+    def load_tags(self):
+        """Loads the tags from the backend resource.
+
+        This function is called by refresh if the timestamp of the backend
+        resource has changed.
+
+        :return: a list of tags with the images attached
+        :rtype: [Tag]
+        """
+        raise NotImplementedError()
+
+    @property
+    def path(self):
+        """The path of the backend resource containing the images and tags."""
+        return self._path
+
+    @property
+    def timestamp(self):
+        """The timestamp when the backend resource was last modified."""
+        return self._timestamp
+
+    def refresh(self):
+        """Reloads all images and tags from the backend resource if it has
+        changed since the last update.
+
+        If the last modification time of :attr:`path` has changed, the backend
+        resource is considered to be changed as well.
+
+        In this case, the internal timestamp is updated and :meth:`load_tags`
+        is called.
+        """
+        # Check the timestamp
+        if self.path:
+            timestamp = os.stat(self._path).st_mtime
+            if timestamp == self._timestamp:
+                return
+            self._timestamp = timestamp
+
+        # Release the old data and reload the tags
+        self.clear()
+        self.load_tags()
+
+    def locate(self, path):
+        self.refresh()
+        return super(FileBasedImageSource, self).locate(path)
 
 
 # Import the actual image sources
@@ -464,14 +479,13 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     def __init__(self,
             mountpoint,
             source = list(ImageSource.SOURCES.keys())[0],
-            database = None,
             photo_path = 'Photos',
             video_path = 'Videos',
-            date_format = '%Y-%m-%d, %H.%M'):
+            date_format = '%Y-%m-%d, %H.%M',
+            **kwargs):
         super(PhotoFS, self).__init__()
 
         self.source = source
-        self.database = database
         self.photo_path = photo_path
         self.video_path = video_path
         self.date_format = date_format
@@ -483,7 +497,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
         # Create the image source
         self.image_source = ImageSource.get(self.source)(
-            self.database, self.date_format)
+            date_format = self.date_format, **kwargs)
 
         try:
             # Make sure the photo and video paths are strs
@@ -557,8 +571,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             self.fs = file_system
             self._include_filter = recursive_filter
 
-            self.fs.image_source.refresh()
-
         def getattr(self, root, path):
             """Performs a stat on ``/root/path``.
 
@@ -574,7 +586,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             :raises fuse.FuseOSError: if an error occurs
             """
-            self.fs.image_source.refresh()
             try:
                 item = self.fs.image_source.locate(path)
 
@@ -608,7 +619,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             :raises fuse.FuseOSError: if an error occurs
             """
-            self.fs.image_source.refresh()
             try:
                 item = self.fs.image_source.locate(path)
 

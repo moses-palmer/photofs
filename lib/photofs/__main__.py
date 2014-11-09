@@ -42,7 +42,6 @@ def main():
     photofs_args = {name: args.pop(name)
         for name in (
             'source',
-            'database',
             'photo_path',
             'video_path',
             'date_format')

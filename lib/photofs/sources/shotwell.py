@@ -22,7 +22,7 @@ from .. import *
 
 
 @ImageSource.register('shotwell')
-class ShotwellSource(ImageSource):
+class ShotwellSource(FileBasedImageSource):
     """Loads images and videos from Shotwell.
     """
     def _default_location(self):
