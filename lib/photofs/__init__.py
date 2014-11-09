@@ -462,6 +462,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     :raises RuntimeError: if an error occurs
     """
     def __init__(self,
+            mountpoint,
             source = list(ImageSource.SOURCES.keys())[0],
             database = None,
             photo_path = 'Photos',
@@ -503,8 +504,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
 
-            # Use the lstat result of the database directory for all directories
-            self.dirstat = os.lstat(os.path.dirname(self.image_source.path))
+            # Use the lstat result of the mount point for all directories
+            self.dirstat = os.lstat(mountpoint)
 
         except Exception as e:
             try:

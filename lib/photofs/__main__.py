@@ -54,7 +54,7 @@ def main():
         if not value is None}
 
     try:
-        photo_fs = PhotoFS(**photofs_args)
+        photo_fs = PhotoFS(args['mountpoint'], **photofs_args)
         fuse.FUSE(photo_fs, fsname = 'photofs', **fuse_args)
     except Exception as e:
         import traceback; traceback.print_exc()
