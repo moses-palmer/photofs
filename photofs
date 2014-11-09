@@ -25,7 +25,6 @@ import tempfile
 # For FUSE
 import errno
 import fuse
-fuse.fuse_python_api = (0, 2)
 
 # For guessing whether a file is an image or a video when the source does not
 # know
@@ -268,6 +267,21 @@ class ImageSource(dict):
             self.SOURCES[name] = cls
             return cls
         return inner
+
+    @classmethod
+    def get(self, name):
+        """Returns the class responsible for a named image source.
+
+        :param str name: The name of the source.
+
+        :return: the corresponding class
+
+        :raises ValueError: if ``name`` is not a known image source
+        """
+        try:
+            return self.SOURCES[name]
+        except KeyError:
+            raise ValueError('%s is not a valid image source', name)
 
     def _default_location(self):
         """Returns the default location of the backend resource.
@@ -532,82 +546,73 @@ class ShotwellSource(ImageSource):
             db.close()
 
 
-class PhotoFS(fuse.Fuse):
+class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     """An implementation of a *FUSE* file system.
 
     It presents the tagged image libraries from image sources as a tag tree in
     the file system.
+
+    :param ImageSource source: The image source.
+
+    :param database: An override for the default database file for the
+        selected image source.
+    :type database: str or None
+
+    :param str photo_path: The directory in the mounted root to contain photos.
+
+    :param str video_path: The directory in the mounted root to contain videos.
+
+    :param str date_format: The date format string used to construct file names
+        from time stamps.
+
+    :param bool force_temporary: Whether to force the actual database file used
+        to be a temporary file, and copy the content of ``database`` to this
+        file.
+
+    :param sync_to: A file to which to copy the database used when changes are
+        detected.
+    :type sync_to: str or None
+
+    :raises RuntimeError: if an error occurs
     """
-    def __init__(self):
+    def __init__(self,
+            source = list(ImageSource.SOURCES.keys())[0],
+            database = None,
+            photo_path = 'Photos',
+            video_path = 'Videos',
+            date_format = '%Y-%m-%d, %H.%M',
+            force_temporary = False,
+            sync_to = None):
         super(PhotoFS, self).__init__()
 
         self._sync = None
 
-        self.source = ImageSource.SOURCES.keys()[0]
-
-        self.database = None
-        self.parser.add_option(mountopt = 'database', metavar = 'DATABASE',
-            default = self.database,
-            help =
-                'The database file to use. You do not need to specify this if '
-                'you are using the default database for the source.')
-
-        self.photo_path = 'Photos'
-        self.parser.add_option(mountopt = 'photo_path', metavar = 'PATH',
-            default = self.photo_path,
-            help =
-                'The directory in which to place all photo tag '
-                'subdirectories. Default: %default')
-
-        self.video_path = 'Videos'
-        self.parser.add_option(mountopt = 'video_path', metavar = 'PATH',
-            default = self.video_path,
-            help =
-                'The directory in which to place all video tag '
-                'subdirectories. Default: %default')
-
-        self.date_format = '%Y-%m-%d, %H.%M'
-        self.parser.add_option(mountopt = 'date_format', metavar = 'FORMAT',
-            default = self.date_format,
-            help =
-                'The date format to use when creating file names. Default: '
-                '%default.')
-
-        self.force_temporary = False
-        self.parser.add_option(mountopt = 'force_temporary',
-            action = 'store_true',
-            help =
-                'Whether to use a temporary file as database file. This option '
-                'can be used when the database file is located on a network '
-                'file system. This option is effective only when database is '
-                'set.')
-
-        self.sync_to = None
-        self.parser.add_option(mountopt = 'sync_to', metavar = 'PATH',
-            default = self.sync_to,
-            help =
-                'A path to which to copy the database file when it is changed. '
-                'This option will override force_temporary')
+        self.source = source
+        self.database = database
+        self.photo_path = photo_path
+        self.video_path = video_path
+        self.date_format = date_format
+        self.force_temporary = force_temporary
+        self.sync_to = sync_to
 
         self.creation = None
         self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
-    def fsinit(self):
         if self.force_temporary:
             fd, name = tempfile.mkstemp()
             self.sync_start(self.database, name, True)
             self.database = name
 
+        # Create the image source
+        self.image_source = ImageSource.get(self.source)(
+            self.database, self.date_format)
+
         try:
             # Make sure the photo and video paths are strs
             self.photo_path = str(self.photo_path)
             self.video_path = str(self.video_path)
-
-            # Create the image source
-            self.image_source = ImageSource.SOURCES[self.source](
-                self.database, self.date_format)
 
             # Load the photo and video resolvers
             self.resolvers = {
@@ -628,17 +633,20 @@ class PhotoFS(fuse.Fuse):
 
         except Exception as e:
             try:
-                print('Failed to initialise file system: %s'
-                    % e.args[0] % e.args[1:])
+                raise RuntimeError('Failed to initialise file system: %s',
+                    e.args[0] % e.args[1:])
             except:
-                print('Failed to initialise file system: %s'
-                    % str(e))
+                raise RuntimeError('Failed to initialise file system: %s',
+                    str(e))
 
         else:
             if self.sync_to:
                 # If a sync_to argument has been provided, we make sure that
                 # file is kept up-to-date with the actual database
                 self.sync_start(self.image_source.path, self.sync_to)
+
+    def destroy(self, path):
+        self.sync_stop()
 
     class ImageResolver(object):
         """This class resolves image requests.
@@ -693,6 +701,8 @@ class PhotoFS(fuse.Fuse):
 
             :return: a :class:`os.stat_result` object for the path
             :rtype: os.stat_result
+
+            :raises fuse.FuseOSError: if an error occurs
             """
             self.fs.image_source.refresh()
             try:
@@ -711,7 +721,7 @@ class PhotoFS(fuse.Fuse):
                         os.path.sep.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
         def readdir(self, root, path):
             """Performs a directory listing on ``/root/path``.
@@ -723,10 +733,10 @@ class PhotoFS(fuse.Fuse):
             :param str path: The path to resolve. This has to begin with
                 :attr:`os.path.sep`, and it must be resolved to a dictionary.
 
-            :return: a sequence of :class:`fuse.Direntry` instances describing
-                the directory, or an error code if the directory could not be
-                read
-            :rtype: fuse.Direntry or int
+            :return: a sequence of strings describing the directory
+            :rtype: [str]
+
+            :raises fuse.FuseOSError: if an error occurs
             """
             self.fs.image_source.refresh()
             try:
@@ -734,16 +744,16 @@ class PhotoFS(fuse.Fuse):
 
                 if isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
-                    return [fuse.Direntry(d)
-                        for d in ['.', '..'] + [k for k, v in item.items()
-                            if self._include_filter(v)]]
+                    return [k
+                        for k, v in item.items()
+                        if self._include_filter(v)]
 
                 else:
                     raise RuntimeError('Unknown object: %s',
                         os.path.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
     def sync_stop(self):
         """Stops the external process responsible for syncing the database
@@ -816,7 +826,7 @@ class PhotoFS(fuse.Fuse):
         else:
             return (path, '')
 
-    def getattr(self, path):
+    def getattr(self, path, fh = None):
         try:
             root, rest = self.split_path(path)
 
@@ -824,17 +834,32 @@ class PhotoFS(fuse.Fuse):
                 # Unless path is the root, it must be in the resolvers; the root
                 # and any items directly below it are directories
                 if root and not root in self.resolvers:
-                    return -errno.ENOENT
+                    raise fuse.FuseOSError(errno.ENOENT)
                 else:
-                    return self.dirstat
+                    st = self.dirstat
+            else:
+                st = self.resolvers[root].getattr(root, os.path.sep + rest)
 
-            return self.resolvers[root].getattr(root, os.path.sep + rest)
+            return dict(
+                # Remove write permission bits
+                st_mode = st.st_mode & ~146,
+
+                st_gid = st.st_gid,
+                st_uid = st.st_uid,
+
+                st_nlink = st.st_nlink,
+
+                st_atime = st.st_atime,
+                st_ctime = st.st_ctime,
+                st_mtime = st.st_mtime,
+
+                st_size = st.st_size)
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
 
     def readdir(self, path, offset):
@@ -843,16 +868,21 @@ class PhotoFS(fuse.Fuse):
 
             if not root:
                 # The root contains the resolver names
-                return [fuse.Direntry(d)
-                    for d in ['.', '..'] + self.resolvers.keys()]
+                items = [d
+                    for d in self.resolvers.keys()]
+            else:
+                items = self.resolvers[root].readdir(root, os.path.sep + rest)
 
-            return self.resolvers[root].readdir(root, os.path.sep + rest)
+            # We return tuples instead of strings since fusepy on Python 2.x
+            # incorrectly treats unicode as non-string
+            return [(i, None, 0)
+                for i in items]
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
     def readlink(self, path):
         self.image_source.refresh()
@@ -872,40 +902,91 @@ class PhotoFS(fuse.Fuse):
                         os.path.sep.join(root, path))
 
             except KeyError:
-                return -errno.ENOENT
+                raise fuse.FuseOSError(errno.ENOENT)
 
         except KeyError:
-            return -errno.ENOENT
+            raise fuse.FuseOSError(errno.ENOENT)
 
         except OSError as e:
-            return -e.errno
+            raise fuse.FuseOSError(e.errno)
 
     def open(self, path, flags):
-        # Get the source file; this will be an errno constant on error
-        source_or_error = self.readlink(path)
-        if isinstance(source_or_error, int):
-            return source_or_error
+        return os.open(self.readlink(path), flags)
 
-        # Return a file object
-        return open(source_or_error, 'rb')
-
-    def release(self, path, flags, fh):
+    def release(self, path, fh):
         try:
-            fh.close()
+            os.close(fh)
         except:
-            return -errno.EINVAL
+            raise fuse.FuseOSError(errno.EINVAL)
 
     def read(self, path, size, offset, fh):
-        fh.seek(offset)
-        return fh.read(size)
+        os.lseek(fh, offset, 0)
+        return os.read(fh, size)
 
 
 def main():
-    photo_fs = PhotoFS()
-    photo_fs.parse(values = photo_fs, errex = 1)
+    import argparse
 
-    photo_fs.main()
-    photo_fs.sync_stop()
+    parser = argparse.ArgumentParser(
+        add_help = True,
+        description =
+            'Explore tagged images from Shotwell in the file system.',
+        epilog =
+            'In addition to the command line options specified above, this '
+            'program accepts all standard FUSE command line options.')
+
+    parser.add_argument('mountpoint',
+        help = 'The file system mount point.')
+
+    parser.add_argument('--debug', '-d',
+        help = 'Enable debug logging.',
+        type = bool)
+
+    parser.add_argument('--foreground', '-f',
+        help = 'Run the daemon in the foreground.',
+        action = 'store_true')
+
+    class OAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string):
+            try:
+                name, value = values[0].split('=')
+            except ValueError:
+                name, value = values[0], True
+            setattr(namespace, name, value)
+    parser.add_argument('-o',
+        help = 'Any FUSE options.',
+        nargs = 1,
+        action = OAction)
+
+    # First, let args be the argument dict
+    args = vars(parser.parse_args())
+
+    # Then pop these known items and pass them on to the PhotoFS constructor
+    photofs_args = {name: args.pop(name)
+        for name in (
+            'source',
+            'database',
+            'photo_path',
+            'video_path',
+            'date_format',
+            'force_temporary',
+            'sync_to')
+        if not args.get(name, None) is None}
+
+    # Then copy all non-None values and pass them to the FUSE constructor
+    fuse_args = {name: value
+        for name, value in args.items()
+        if not value is None}
+
+    try:
+        photo_fs = PhotoFS(**photofs_args)
+        fuse.FUSE(photo_fs, fsname = 'photofs', **fuse_args)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        try:
+            sys.stderr.write('%s\n' % e.args[0] % e.args[1:])
+        except:
+            sys.stderr.write('%s\n' % str(e))
 
 
 if __name__ == '__main__':
