@@ -17,7 +17,6 @@
 
 import os
 import stat
-import subprocess
 import sys
 import time
 
@@ -574,8 +573,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             date_format = '%Y-%m-%d, %H.%M'):
         super(PhotoFS, self).__init__()
 
-        self._sync = None
-
         self.source = source
         self.database = database
         self.photo_path = photo_path
@@ -622,7 +619,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                     str(e))
 
     def destroy(self, path):
-        self.sync_stop()
+        pass
 
     class ImageResolver(object):
         """This class resolves image requests.
@@ -730,55 +727,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             except KeyError:
                 raise fuse.FuseOSError(errno.ENOENT)
-
-    def sync_stop(self):
-        """Stops the external process responsible for syncing the database
-        files.
-
-        If no external process is running, no action is taken.
-        """
-        if self._sync:
-            self._sync.kill()
-            self._sync = None
-
-    def sync_start(self, source, target, remove_target = False):
-        """Starts an external process to sync ``source`` and ``target``.
-
-        The process will make sure that any time ``source`` is changed, its
-        content and attributes will be copied to ``target``.
-
-        The external process will have copied ``source`` to ``target`` before
-        this method returns.
-
-        :param str source: The source file.
-
-        :param str target: The target file.
-
-        :param bool remove_target: If ``True``, the target file will be removed
-            when :meth:`sync_stop` is called.
-
-        :raises OSError: if the program ``photofs-sync-db`` is not available on
-            the system
-
-        :raises RuntimeError: if the sync script exits within one second
-        """
-        # Make sure no sync process is running
-        self.sync_stop()
-
-        # Execute the sync process and read the first line printed
-        sync = subprocess.Popen(
-            ['photofs-sync-db',
-                source,
-                target,
-                'cleanup' if remove_target else 'none'],
-            stdout = subprocess.PIPE)
-        line = sync.stdout.readline()
-
-        code = sync.poll()
-        if not code is None:
-            raise RuntimeError('Failed to execute sync script: %s', line)
-
-        self._sync = sync
 
     def split_path(self, path):
         """Returns the tuple ``(root, rest)`` for a path, where ``root`` is the

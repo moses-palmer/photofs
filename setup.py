@@ -49,8 +49,7 @@ def setup(**kwargs):
         url = PACKAGE_URL,
 
         scripts = [
-            'scripts/photofs',
-            'photofs-sync-db'],
+            'scripts/photofs'],
         packages = setuptools.find_packages(LIB_DIR),
         package_dir = {'': LIB_DIR},
         zip_safe = True,
