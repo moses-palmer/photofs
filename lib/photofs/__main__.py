@@ -45,6 +45,9 @@ def main():
         nargs = 1,
         action = OAction)
 
+    # Add image source specific command line arguments
+    for source in ImageSource.SOURCES.values():
+        source.add_arguments(parser)
 
     # First, let args be the argument dict, but remove undefined values
     args = {name: value

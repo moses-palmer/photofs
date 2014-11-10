@@ -239,6 +239,16 @@ class ImageSource(dict):
     SOURCES = {}
 
     @classmethod
+    def add_arguments(self, argparser):
+        """Adds all command line arguments for this image source to an argument
+        parser.
+
+        :param argparse.ArgumentParser argparser: The argument parser to which
+            to add arguments.
+        """
+        pass
+
+    @classmethod
     def register(self, name):
         """A decorator that registers an :class:`ImageSource` subclass as an
         image source.
@@ -340,6 +350,9 @@ class ImageSource(dict):
         :param str date_format: The date format to use when creating file names
             for images that do not have a title.
         """
+        if kwargs:
+            raise ValueError('Unsupported command line argument: %s',
+                ', '.join(k for k in kwargs))
         super(ImageSource, self).__init__()
         self._date_format = date_format
 
@@ -372,6 +385,18 @@ class FileBasedImageSource(ImageSource):
 
     This is an abstract class.
     """
+    @classmethod
+    def add_arguments(self, argparser):
+        """Adds all command line arguments for this image source to an argument
+        parser.
+
+        :param argparse.ArgumentParser argparser: The argument parser to which
+            to add arguments.
+        """
+        argparser.add_argument('--database', help =
+            'The database file to use. If not specified, the default one is '
+            'used.')
+
     def __init__(self, database = None, **kwargs):
         """Creates a new ImageSource.
 
