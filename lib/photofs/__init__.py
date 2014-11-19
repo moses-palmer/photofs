@@ -529,6 +529,20 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 raise RuntimeError('Failed to initialise file system: %s',
                     str(e))
 
+    def __getitem__(self, path):
+        """Reads the item at ``path``.
+
+        The root component of the path is discarded.
+
+        :param str path: The path for which to find the item.
+
+        :returns: the tag or image
+        :rtype: Tag or Image
+        """
+        self.image_source.refresh()
+        root, rest = self.split_path(path)
+        return self.image_source.locate(os.path.sep + rest)
+
     def destroy(self, path):
         pass
 
@@ -716,33 +730,25 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             raise fuse.FuseOSError(e.errno)
 
     def readlink(self, path):
-        self.image_source.refresh()
         try:
-            root, rest = self.split_path(path)
+            item = self[path]
 
-            # A call to readlink may only happen on an item in a resolver
-            try:
-                item = self.image_source.locate(os.path.sep + rest)
-
-                if isinstance(item, Image):
-                    # This is a file
-                    return item.location
-
-                else:
-                    raise RuntimeError('Unknown object: %s',
-                        os.path.sep.join(root, path))
-
-            except KeyError:
-                raise fuse.FuseOSError(errno.ENOENT)
+            if isinstance(item, Image):
+                # This is a file
+                return item.location
+            else:
+                raise RuntimeError('Unknown object: %s',
+                    os.path.sep.join(root, path))
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
 
-        except OSError as e:
-            raise fuse.FuseOSError(e.errno)
-
     def open(self, path, flags):
-        return os.open(self.readlink(path), flags)
+        item = self[path]
+        if isinstance(item, Image):
+            return os.open(item.location, flags)
+        else:
+            raise fuse.FuseOSError(errno.EINVAL)
 
     def release(self, path, fh):
         try:
