@@ -183,12 +183,6 @@ class Tag(dict):
         return self._name
 
     @property
-    def path(self):
-        """The full path of this tag. This is an absolute path."""
-        return os.path.sep.join((self._parent.path, self._name)) \
-            if self._parent else os.path.sep + self._name
-
-    @property
     def parent(self):
         """The parent of this tag."""
         return self._parent
