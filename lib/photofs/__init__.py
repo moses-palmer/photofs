@@ -17,10 +17,8 @@
 
 import os
 import stat
-import subprocess
 import sys
 import time
-import tempfile
 
 # For FUSE
 import errno
@@ -29,16 +27,6 @@ import fuse
 # For guessing whether a file is an image or a video when the source does not
 # know
 import mimetypes
-
-from xdg.BaseDirectory import xdg_config_dirs, xdg_data_dirs
-
-
-# Give the user a warning if sqlite cannot be imported
-try:
-    import sqlite3
-except ImportError:
-    print('This program requires sqlite3')
-    sys.exit(1)
 
 
 def make_unique(mapping, base_name, format_1, format_n, *args):
@@ -185,12 +173,6 @@ class Tag(dict):
         return self._name
 
     @property
-    def path(self):
-        """The full path of this tag. This is an absolute path."""
-        return os.path.sep.join((self._parent.path, self._name)) \
-            if self._parent else os.path.sep + self._name
-
-    @property
     def parent(self):
         """The parent of this tag."""
         return self._parent
@@ -257,6 +239,16 @@ class ImageSource(dict):
     SOURCES = {}
 
     @classmethod
+    def add_arguments(self, argparser):
+        """Adds all command line arguments for this image source to an argument
+        parser.
+
+        :param argparse.ArgumentParser argparser: The argument parser to which
+            to add arguments.
+        """
+        pass
+
+    @classmethod
     def register(self, name):
         """A decorator that registers an :class:`ImageSource` subclass as an
         image source.
@@ -282,26 +274,6 @@ class ImageSource(dict):
             return self.SOURCES[name]
         except KeyError:
             raise ValueError('%s is not a valid image source', name)
-
-    def _default_location(self):
-        """Returns the default location of the backend resource.
-
-        :return: the default location of the backend resource, or ``None`` if
-            none exists
-        :rtype: str or None
-        """
-        raise NotImplementedError()
-
-    def _load_tags(self):
-        """Loads the tags from the backend resource.
-
-        This function is called by refresh if the timestamp of the backend
-        resource has changed.
-
-        :return: a list of tags with the images attached
-        :rtype: [Tag]
-        """
-        raise NotImplementedError()
 
     def _break_path(self, path):
         """Breaks an absolute path into its segments.
@@ -372,55 +344,17 @@ class ImageSource(dict):
 
         return current
 
-    def __init__(self, path = None, date_format = '%Y-%m-%d, %H.%M', **kwargs):
+    def __init__(self, date_format = '%Y-%m-%d, %H.%M', **kwargs):
         """Creates a new ImageSource.
-
-        :param str path: The path to the backend database or directory for this
-            image source. If :meth:`refresh` is not overloaded, this must be a
-            valid file name. Its timestamp is used to determine whether to
-            actually reload all images and tags. If this is not provided, a
-            default location is used.
 
         :param str date_format: The date format to use when creating file names
             for images that do not have a title.
         """
+        if kwargs:
+            raise ValueError('Unsupported command line argument: %s',
+                ', '.join(k for k in kwargs))
         super(ImageSource, self).__init__()
-        self._path = path or self._default_location()
-        if self._path is None:
-            raise ValueError('No database')
         self._date_format = date_format
-        self._timestamp = 0
-
-    @property
-    def path(self):
-        """The path of the backend resource containing the images and tags."""
-        return self._path
-
-    @property
-    def timestamp(self):
-        """The timestamp when the backend resource was last modified."""
-        return self._timestamp
-
-    def refresh(self):
-        """Reloads all images and tags from the backend resource if it has
-        changed since the last update.
-
-        If the last modification time of :attr:`path` has changed, the backend
-        resource is considered to be changed as well.
-
-        In this case, the internal timestamp is updated and :meth:`_load_tags`
-        is called.
-        """
-        # Check the timestamp
-        if self._path:
-            timestamp = os.stat(self._path).st_mtime
-            if timestamp == self._timestamp:
-                return
-            self._timestamp = timestamp
-
-        # Release the old data and reload the tags
-        self.clear()
-        self._load_tags()
 
     def locate(self, path):
         """Locates an image or tag.
@@ -446,104 +380,97 @@ class ImageSource(dict):
         return current
 
 
-@ImageSource.register('shotwell')
-class ShotwellSource(ImageSource):
-    """Loads images and videos from Shotwell.
-    """
-    def _default_location(self):
-        """Determines the location of the *Shotwell* database.
+class FileBasedImageSource(ImageSource):
+    """A source of images and tags where the backend is file based.
 
-        :return: the location of the database, or ``None`` if it cannot be
-            located
+    This is an abstract class.
+    """
+    @classmethod
+    def add_arguments(self, argparser):
+        """Adds all command line arguments for this image source to an argument
+        parser.
+
+        :param argparse.ArgumentParser argparser: The argument parser to which
+            to add arguments.
+        """
+        argparser.add_argument('--database', help =
+            'The database file to use. If not specified, the default one is '
+            'used.')
+
+    def __init__(self, database = None, **kwargs):
+        """Creates a new ImageSource.
+
+        :param str database: The path to the backend database or directory for
+            this image source. If :meth:`refresh` is not overloaded, this must
+            be a valid file name. Its timestamp is used to determine whether to
+            actually reload all images and tags. If this is not provided, a
+            default location is used.
+        """
+        super(FileBasedImageSource, self).__init__(**kwargs)
+        self._path = database or self.default_location
+        if self._path is None:
+            raise ValueError('No database')
+        self._timestamp = 0
+
+    def load_tags(self):
+        """Loads the tags from the backend resource.
+
+        This function is called by refresh if the timestamp of the backend
+        resource has changed.
+
+        :return: a list of tags with the images attached
+        :rtype: [Tag]
+        """
+        raise NotImplementedError()
+
+    @property
+    def default_location(self):
+        """Returns the default location of the backend resource.
+
+        :return: the default location of the backend resource, or ``None`` if
+            none exists
         :rtype: str or None
         """
-        for d in xdg_data_dirs:
-            result = os.path.join(d, 'shotwell', 'data', 'photo.db')
-            if os.access(result, os.R_OK):
-                return result
+        raise NotImplementedError()
 
-    def _load_tags(self):
-        db = sqlite3.connect(self._path)
-        try:
-            # The descriptions of the different image tables; the value tuple is
-            # the header of the ID in the tag table, the map of IDs to images
-            # and whether the table contains videos
-            db_tables = {
-                'phototable': ('thumb', {}, False),
-                'videotable': ('video-', {}, True)}
+    @property
+    def path(self):
+        """The path of the backend resource containing the images and tags."""
+        return self._path
 
-            # Load the images
-            for table_name, (header, images, is_video) in db_tables.items():
-                results = db.execute("""
-                    SELECT id, filename, exposure_time, title
-                        FROM %s""" % table_name)
-                for r_id, r_filename, r_exposure_time, r_title in results:
-                    # Make sure the title is set to a reasonable value
-                    if not r_title:
-                        r_title = time.strftime(self._date_format,
-                            time.localtime(r_exposure_time))
+    @property
+    def timestamp(self):
+        """The timestamp when the backend resource was last modified."""
+        return self._timestamp
 
-                    images[r_id] = Image(
-                        r_filename,
-                        int(r_exposure_time),
-                        r_title,
-                        is_video)
+    def refresh(self):
+        """Reloads all images and tags from the backend resource if it has
+        changed since the last update.
 
-            # Load the tags
-            results = db.execute("""
-                SELECT name, photo_id_list
-                    FROM tagtable
-                    ORDER BY name""")
-            for r_name, r_photo_id_list in results:
-                # Ignore unused tags
-                if not r_photo_id_list:
-                    continue
+        If the last modification time of :attr:`path` has changed, the backend
+        resource is considered to be changed as well.
 
-                # Hierachial tag names start with '/'
-                path = r_name.split('/') if r_name[0] == '/' else ['', r_name]
-                path_name = os.path.sep.join(path)
+        In this case, the internal timestamp is updated and :meth:`load_tags`
+        is called.
+        """
+        # Check the timestamp
+        if self.path:
+            timestamp = os.stat(self._path).st_mtime
+            if timestamp == self._timestamp:
+                return
+            self._timestamp = timestamp
 
-                # Make sure that the tag and all its parents exist
-                tag = self._make_tags(path_name)
+        # Release the old data and reload the tags
+        self.clear()
+        self.load_tags()
 
-                # The IDs are all in the text of photo_id_list, separated by
-                # commas; there is an extra comma at the end
-                ids = r_photo_id_list.split(',')[:-1]
+    def locate(self, path):
+        self.refresh()
+        return super(FileBasedImageSource, self).locate(path)
 
-                # Iterate over all image IDs and move them to this tag
-                for i in ids:
-                    if i[0].isdigit():
-                        # If the first character is a digit, this is a legacy
-                        # source ID and an ID in the photo table
-                        image = db_tables['phototable'][1].get(int(i))
-                    else:
-                        # Iterate over all database tables and locate the image
-                        # instance for the current ID
-                        image = None
-                        for table_name, (header, images, is_video) \
-                                in db_tables.items():
-                            if not i.startswith(header):
-                                continue
-                            image = images.get(int(i[len(header):], 16))
-                            break
 
-                    # Verify that the tag only references existing images
-                    if image is None:
-                        continue
-
-                    # Remove the image from the parent tags
-                    parent = tag.parent
-                    while parent:
-                        for k, v in parent.items():
-                            if v == image:
-                                del parent[k]
-                        parent = parent.parent
-
-                    # Finally add the image to this tag
-                    tag.add(image)
-
-        finally:
-            db.close()
+# Import the actual image sources
+from .sources import *
 
 
 class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
@@ -565,49 +492,30 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     :param str date_format: The date format string used to construct file names
         from time stamps.
 
-    :param bool force_temporary: Whether to force the actual database file used
-        to be a temporary file, and copy the content of ``database`` to this
-        file.
-
-    :param sync_to: A file to which to copy the database used when changes are
-        detected.
-    :type sync_to: str or None
-
     :raises RuntimeError: if an error occurs
     """
     def __init__(self,
+            mountpoint,
             source = list(ImageSource.SOURCES.keys())[0],
-            database = None,
             photo_path = 'Photos',
             video_path = 'Videos',
             date_format = '%Y-%m-%d, %H.%M',
-            force_temporary = False,
-            sync_to = None):
+            **kwargs):
         super(PhotoFS, self).__init__()
 
-        self._sync = None
-
         self.source = source
-        self.database = database
         self.photo_path = photo_path
         self.video_path = video_path
         self.date_format = date_format
-        self.force_temporary = force_temporary
-        self.sync_to = sync_to
 
         self.creation = None
         self.dirstat = None
         self.image_source = None
         self.resolvers = {}
 
-        if self.force_temporary:
-            fd, name = tempfile.mkstemp()
-            self.sync_start(self.database, name, True)
-            self.database = name
-
         # Create the image source
         self.image_source = ImageSource.get(self.source)(
-            self.database, self.date_format)
+            date_format = self.date_format, **kwargs)
 
         try:
             # Make sure the photo and video paths are strs
@@ -628,8 +536,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
 
-            # Use the lstat result of the database directory for all directories
-            self.dirstat = os.lstat(os.path.dirname(self.image_source.path))
+            # Use the lstat result of the mount point for all directories
+            self.dirstat = os.lstat(mountpoint)
 
         except Exception as e:
             try:
@@ -639,14 +547,22 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 raise RuntimeError('Failed to initialise file system: %s',
                     str(e))
 
-        else:
-            if self.sync_to:
-                # If a sync_to argument has been provided, we make sure that
-                # file is kept up-to-date with the actual database
-                self.sync_start(self.image_source.path, self.sync_to)
+    def __getitem__(self, path):
+        """Reads the item at ``path``.
+
+        The root component of the path is discarded.
+
+        :param str path: The path for which to find the item.
+
+        :returns: the tag or image
+        :rtype: Tag or Image
+        """
+        self.image_source.refresh()
+        root, rest = self.split_path(path)
+        return self.image_source.locate(os.path.sep + rest)
 
     def destroy(self, path):
-        self.sync_stop()
+        pass
 
     class ImageResolver(object):
         """This class resolves image requests.
@@ -687,8 +603,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             self.fs = file_system
             self._include_filter = recursive_filter
 
-            self.fs.image_source.refresh()
-
         def getattr(self, root, path):
             """Performs a stat on ``/root/path``.
 
@@ -704,7 +618,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             :raises fuse.FuseOSError: if an error occurs
             """
-            self.fs.image_source.refresh()
             try:
                 item = self.fs.image_source.locate(path)
 
@@ -738,7 +651,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             :raises fuse.FuseOSError: if an error occurs
             """
-            self.fs.image_source.refresh()
             try:
                 item = self.fs.image_source.locate(path)
 
@@ -754,55 +666,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             except KeyError:
                 raise fuse.FuseOSError(errno.ENOENT)
-
-    def sync_stop(self):
-        """Stops the external process responsible for syncing the database
-        files.
-
-        If no external process is running, no action is taken.
-        """
-        if self._sync:
-            self._sync.kill()
-            self._sync = None
-
-    def sync_start(self, source, target, remove_target = False):
-        """Starts an external process to sync ``source`` and ``target``.
-
-        The process will make sure that any time ``source`` is changed, its
-        content and attributes will be copied to ``target``.
-
-        The external process will have copied ``source`` to ``target`` before
-        this method returns.
-
-        :param str source: The source file.
-
-        :param str target: The target file.
-
-        :param bool remove_target: If ``True``, the target file will be removed
-            when :meth:`sync_stop` is called.
-
-        :raises OSError: if the program ``photofs-sync-db`` is not available on
-            the system
-
-        :raises RuntimeError: if the sync script exits within one second
-        """
-        # Make sure no sync process is running
-        self.sync_stop()
-
-        # Execute the sync process and read the first line printed
-        sync = subprocess.Popen(
-            ['photofs-sync-db',
-                source,
-                target,
-                'cleanup' if remove_target else 'none'],
-            stdout = subprocess.PIPE)
-        line = sync.stdout.readline()
-
-        code = sync.poll()
-        if not code is None:
-            raise RuntimeError('Failed to execute sync script: %s', line)
-
-        self._sync = sync
 
     def split_path(self, path):
         """Returns the tuple ``(root, rest)`` for a path, where ``root`` is the
@@ -885,33 +748,25 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             raise fuse.FuseOSError(e.errno)
 
     def readlink(self, path):
-        self.image_source.refresh()
         try:
-            root, rest = self.split_path(path)
+            item = self[path]
 
-            # A call to readlink may only happen on an item in a resolver
-            try:
-                item = self.image_source.locate(os.path.sep + rest)
-
-                if isinstance(item, Image):
-                    # This is a file
-                    return item.location
-
-                else:
-                    raise RuntimeError('Unknown object: %s',
-                        os.path.sep.join(root, path))
-
-            except KeyError:
-                raise fuse.FuseOSError(errno.ENOENT)
+            if isinstance(item, Image):
+                # This is a file
+                return item.location
+            else:
+                raise RuntimeError('Unknown object: %s',
+                    os.path.sep.join(root, path))
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
 
-        except OSError as e:
-            raise fuse.FuseOSError(e.errno)
-
     def open(self, path, flags):
-        return os.open(self.readlink(path), flags)
+        item = self[path]
+        if isinstance(item, Image):
+            return os.open(item.location, flags)
+        else:
+            raise fuse.FuseOSError(errno.EINVAL)
 
     def release(self, path, fh):
         try:
@@ -922,72 +777,3 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     def read(self, path, size, offset, fh):
         os.lseek(fh, offset, 0)
         return os.read(fh, size)
-
-
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        add_help = True,
-        description =
-            'Explore tagged images from Shotwell in the file system.',
-        epilog =
-            'In addition to the command line options specified above, this '
-            'program accepts all standard FUSE command line options.')
-
-    parser.add_argument('mountpoint',
-        help = 'The file system mount point.')
-
-    parser.add_argument('--debug', '-d',
-        help = 'Enable debug logging.',
-        type = bool)
-
-    parser.add_argument('--foreground', '-f',
-        help = 'Run the daemon in the foreground.',
-        action = 'store_true')
-
-    class OAction(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string):
-            try:
-                name, value = values[0].split('=')
-            except ValueError:
-                name, value = values[0], True
-            setattr(namespace, name, value)
-    parser.add_argument('-o',
-        help = 'Any FUSE options.',
-        nargs = 1,
-        action = OAction)
-
-    # First, let args be the argument dict
-    args = vars(parser.parse_args())
-
-    # Then pop these known items and pass them on to the PhotoFS constructor
-    photofs_args = {name: args.pop(name)
-        for name in (
-            'source',
-            'database',
-            'photo_path',
-            'video_path',
-            'date_format',
-            'force_temporary',
-            'sync_to')
-        if not args.get(name, None) is None}
-
-    # Then copy all non-None values and pass them to the FUSE constructor
-    fuse_args = {name: value
-        for name, value in args.items()
-        if not value is None}
-
-    try:
-        photo_fs = PhotoFS(**photofs_args)
-        fuse.FUSE(photo_fs, fsname = 'photofs', **fuse_args)
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        try:
-            sys.stderr.write('%s\n' % e.args[0] % e.args[1:])
-        except:
-            sys.stderr.write('%s\n' % str(e))
-
-
-if __name__ == '__main__':
-    main()
