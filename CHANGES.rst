@@ -1,6 +1,10 @@
 Release Notes
 =============
 
+1.2 - Support for multiple architectures
+----------------------------------------
+* Changed FUSE library to one with support for multiple architectures
+
 1.1.1 - Bugfixes
 ----------------
 * Readded missing support for reading link targets
