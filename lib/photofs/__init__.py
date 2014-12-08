@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
 import os
 import stat
 import sys
@@ -61,18 +62,23 @@ def make_unique(mapping, base_name, format_1, format_n, *args):
 class Image(object):
     """An image or video.
     """
+
+    #: The date format used to construct the title when none is set
+    DATE_FORMAT = '%Y-%m-%d, %H.%M'
+
     def __init__(self, location, timestamp, title, is_video = None):
         """
         Initialises an image.
 
         :param str location: The location of this image in the file system.
 
-        :param int timestamp: The timestamp when this image or video was
+        :param timestamp: The timestamp when this image or video was
             created.
+        :type timestamp: int or datetime.datetime
 
         :param str title: The title of the image. This should be used to
-            generate the file name. If the ``title`` is empty or ``None``,
-            ``timestamp`` should be used instead.
+            generate the file name. If ``title`` is empty or ``None``,
+            ``timestamp`` is used instead.
 
         :param bool is_video: Whether this image is a video. This must be either
             ``True`` or ``False``, or ``None``. If it is ``None``, the type is
@@ -80,7 +86,10 @@ class Image(object):
         """
         super(Image, self).__init__()
         self._location = location
-        self._timestamp = timestamp
+        if isinstance(timestamp, datetime.datetime):
+            self._timestamp = timestamp
+        else:
+            self._timestamp = datetime.datetime.fromtimestamp(timestamp)
         self._title = title
         if is_video is None:
             mime, encoding = mimetypes.guess_type(location)
@@ -102,7 +111,8 @@ class Image(object):
     def title(self):
         """The title of this image. Use this to generate the file name if it is
         set."""
-        return self._title
+        return self._title or time.strftime(self.DATE_FORMAT,
+            self.timestamp.timetuple())
 
     @property
     def extension(self):
@@ -347,7 +357,7 @@ class ImageSource(dict):
 
         return current
 
-    def __init__(self, date_format = '%Y-%m-%d, %H.%M', **kwargs):
+    def __init__(self, **kwargs):
         """Creates a new ImageSource.
 
         :param str date_format: The date format to use when creating file names
@@ -357,7 +367,6 @@ class ImageSource(dict):
             raise ValueError('Unsupported command line argument: %s',
                 ', '.join(k for k in kwargs))
         super(ImageSource, self).__init__()
-        self._date_format = date_format
 
     def locate(self, path):
         """Locates an image or tag.
@@ -509,7 +518,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.source = source
         self.photo_path = photo_path
         self.video_path = video_path
-        self.date_format = date_format
+        Image.DATE_FORMAT = date_format
 
         self.creation = None
         self.dirstat = None
@@ -517,8 +526,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.resolvers = {}
 
         # Create the image source
-        self.image_source = ImageSource.get(self.source)(
-            date_format = self.date_format, **kwargs)
+        self.image_source = ImageSource.get(self.source)(**kwargs)
 
         try:
             # Make sure the photo and video paths are strs

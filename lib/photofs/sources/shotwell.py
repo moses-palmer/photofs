@@ -66,14 +66,9 @@ class ShotwellSource(FileBasedImageSource):
                     SELECT id, filename, exposure_time, title
                         FROM %s""" % table_name)
                 for r_id, r_filename, r_exposure_time, r_title in results:
-                    # Make sure the title is set to a reasonable value
-                    if not r_title:
-                        r_title = time.strftime(self._date_format,
-                            time.localtime(r_exposure_time))
-
                     images[r_id] = Image(
                         r_filename,
-                        int(r_exposure_time),
+                        r_exposure_time,
                         r_title,
                         is_video)
 
