@@ -124,6 +124,11 @@ class Image(object):
         """Whether this image is a video."""
         return self._is_video
 
+    @property
+    def stat(self):
+        """The ``stat`` result for this image."""
+        return os.lstat(self.location)
+
 
 class Tag(dict):
     """A tag applied to an image or a video.
@@ -633,7 +638,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
                 if isinstance(item, Image):
                     # This is a file
-                    return os.lstat(item.location)
+                    return item.stat
 
                 elif isinstance(item, dict):
                     # This is a directory; this matches both Tag and ImageSource
