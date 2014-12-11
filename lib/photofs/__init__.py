@@ -129,6 +129,16 @@ class Image(object):
         """The ``stat`` result for this image."""
         return os.lstat(self.location)
 
+    def open(self, flags):
+        """Opens a readable stream to the file.
+
+        :param int flags: Flags passed by *FUSE*.
+
+        :return: an object supporting ``seek(offset)`` and ``read(size)`` from
+            :class:`file`
+        """
+        return open(self.location, 'rb')
+
 
 class Tag(dict):
     """A tag applied to an image or a video.
