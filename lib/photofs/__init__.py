@@ -105,6 +105,11 @@ class Image(object):
         return self._title
 
     @property
+    def extension(self):
+        """The lower case file extension of this image."""
+        return self.location.rsplit('.', 1)[-1].lower()
+
+    @property
     def is_video(self):
         """Whether this image is a video."""
         return self._is_video
@@ -205,10 +210,8 @@ class Tag(dict):
             :class:`Tag`
         """
         if isinstance(item, Image):
-            name, ext = os.path.splitext(item.location)
-
             # Make sure the key name is unique
-            key = self._make_unique(item.title, ext.lower())
+            key = self._make_unique(item.title, '.' + item.extension)
             self[key] = item
 
             self._has_image = self._has_image or not item.is_video
