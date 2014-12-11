@@ -66,10 +66,10 @@ class ShotwellSource(FileBasedImageSource):
                     SELECT id, filename, exposure_time, title
                         FROM %s""" % table_name)
                 for r_id, r_filename, r_exposure_time, r_title in results:
-                    images[r_id] = Image(
+                    images[r_id] = FileBasedImage(
+                        r_title,
                         r_filename,
                         r_exposure_time,
-                        r_title,
                         is_video)
 
             # Load the tags

@@ -66,41 +66,37 @@ class Image(object):
     #: The date format used to construct the title when none is set
     DATE_FORMAT = '%Y-%m-%d, %H.%M'
 
-    def __init__(self, location, timestamp, title, is_video = None):
-        """
-        Initialises an image.
+    def __init__(self, title, extension, timestamp, st, is_video = None):
+        """Initialises an image.
 
-        :param str location: The location of this image in the file system.
+        :param str title: The title of the image. This should be used to
+            generate the file name. If ``title`` is empty or ``None``,
+            ``timestamp`` is used instead.
+
+        :param str extension: The file extension.
 
         :param timestamp: The timestamp when this image or video was
             created.
         :type timestamp: int or datetime.datetime
 
-        :param str title: The title of the image. This should be used to
-            generate the file name. If ``title`` is empty or ``None``,
-            ``timestamp`` is used instead.
+        :param os.stat_result st: The ``stat`` value for this item.
 
         :param bool is_video: Whether this image is a video. This must be either
             ``True`` or ``False``, or ``None``. If it is ``None``, the type is
             inferred from the file *MIME type*.
         """
         super(Image, self).__init__()
-        self._location = location
+        self._title = title
+        self._extension = extension
         if isinstance(timestamp, datetime.datetime):
             self._timestamp = timestamp
         else:
             self._timestamp = datetime.datetime.fromtimestamp(timestamp)
-        self._title = title
         if is_video is None:
-            mime, encoding = mimetypes.guess_type(location)
-            self._is_video = mime and mime.startswith('video/')
-        else:
-            self._is_video = is_video
-
-    @property
-    def location(self):
-        """The location of this image or video in the file system."""
-        return self._location
+            mime, encoding = mimetypes.guess_type('file.' + extension)
+            is_video = mime and mime.startswith('video/')
+        self._stat = st
+        self._is_video = is_video
 
     @property
     def timestamp(self):
@@ -117,7 +113,7 @@ class Image(object):
     @property
     def extension(self):
         """The lower case file extension of this image."""
-        return self.location.rsplit('.', 1)[-1].lower()
+        return self._extension
 
     @property
     def is_video(self):
@@ -127,7 +123,7 @@ class Image(object):
     @property
     def stat(self):
         """The ``stat`` result for this image."""
-        return os.lstat(self.location)
+        return self._stat
 
     def open(self, flags):
         """Opens a readable stream to the file.
@@ -137,6 +133,49 @@ class Image(object):
         :return: an object supporting ``seek(offset)`` and ``read(size)`` from
             :class:`file`
         """
+        raise NotImplementedError()
+
+
+class FileBasedImage(Image):
+    """An image or video.
+    """
+
+    def __init__(self, title, location, timestamp, is_video = None):
+        """Initialises a file based image.
+
+        :param str title: The title of the image. This should be used to
+            generate the file name. If ``title`` is empty or ``None``,
+            ``timestamp`` is used instead.
+
+        :param str location: The location of this image in the file system.
+
+        :param timestamp: The timestamp when this image or video was
+            created.
+        :type timestamp: int or datetime.datetime
+
+        :param bool is_video: Whether this image is a video. This must be either
+            ``True`` or ``False``, or ``None``. If it is ``None``, the type is
+            inferred from the file *MIME type*.
+        """
+        super(FileBasedImage, self).__init__(
+            title,
+            location.rsplit('.', 1)[-1].lower(),
+            timestamp,
+            os.lstat(location),
+            is_video)
+        self._location = location
+
+    @property
+    def location(self):
+        """The location of this image or video in the file system."""
+        return self._location
+
+    @property
+    def stat(self):
+        """The ``stat`` result for this image."""
+        return os.lstat(self.location)
+
+    def open(self, flags):
         return open(self.location, 'rb')
 
 
