@@ -1,4 +1,7 @@
+import sys
+
 from photofs import *
+
 
 def main():
     import argparse
