@@ -71,6 +71,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.image_source = None
         self.resolvers = {}
 
+        self.handles = {}
+
         # Create the image source
         self.image_source = ImageSource.get(self.source)(**kwargs)
 
@@ -306,16 +308,22 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     def open(self, path, flags):
         item = self[path]
         if isinstance(item, Image):
-            return os.open(item.location, flags)
+            handle = item.open(flags)
+            self.handles[id(handle)] = handle
+            return id(handle)
         else:
             raise fuse.FuseOSError(errno.EINVAL)
 
     def release(self, path, fh):
         try:
-            os.close(fh)
+            handle = self.handles[fh]
+            handle.close()
+            del self.handles[fh]
         except:
             raise fuse.FuseOSError(errno.EINVAL)
 
     def read(self, path, size, offset, fh):
-        os.lseek(fh, offset, 0)
-        return os.read(fh, size)
+        handle = self.handles[fh]
+        if handle.tell() != offset:
+            handle.seek(offset)
+        return handle.read(size)
