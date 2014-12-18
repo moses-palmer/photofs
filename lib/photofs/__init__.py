@@ -557,7 +557,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         :returns: the tag or image
         :rtype: Tag or Image
         """
-        self.image_source.refresh()
         root, rest = self.split_path(path)
         return self.image_source.locate(os.path.sep + rest)
 
