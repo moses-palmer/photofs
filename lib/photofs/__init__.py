@@ -16,6 +16,7 @@
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import threading
 import time
 
 # For FUSE
@@ -309,21 +310,23 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         item = self[path]
         if isinstance(item, Image):
             handle = item.open(flags)
-            self.handles[id(handle)] = handle
+            self.handles[id(handle)] = (handle, threading.Lock())
             return id(handle)
         else:
             raise fuse.FuseOSError(errno.EINVAL)
 
     def release(self, path, fh):
         try:
-            handle = self.handles[fh]
-            handle.close()
+            handle, lock = self.handles[fh]
+            with lock:
+                handle.close()
             del self.handles[fh]
         except:
             raise fuse.FuseOSError(errno.EINVAL)
 
     def read(self, path, size, offset, fh):
-        handle = self.handles[fh]
-        if handle.tell() != offset:
-            handle.seek(offset)
-        return handle.read(size)
+        handle, lock = self.handles[fh]
+        with lock:
+            if handle.tell() != offset:
+                handle.seek(offset)
+            return handle.read(size)
