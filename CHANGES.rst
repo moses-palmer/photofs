@@ -1,6 +1,10 @@
 Release Notes
 =============
 
+1.2.1 - Bugfixes
+----------------
+* Corrected data corruption when multiple threads access same handle
+
 1.2 - Support for multiple architectures
 ----------------------------------------
 * Changed FUSE library to one with support for multiple architectures
