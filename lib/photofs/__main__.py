@@ -48,22 +48,25 @@ def main():
             except ValueError:
                 name, value = values[0], True
             fuse_args[name] = value
-    parser.add_argument('-o',
-        help = 'Any FUSE options.',
-        nargs = 1,
-        action = OAction)
+    parser.add_argument(
+        '-o',
+        help='Any FUSE options.',
+        nargs=1,
+        action=OAction)
 
     # Add image source specific command line arguments
     for source in ImageSource.SOURCES.values():
         source.add_arguments(parser)
 
     # First, let args be the argument dict, but remove undefined values
-    args = {name: value
+    args = {
+        name: value
         for name, value in vars(parser.parse_args()).items()
-        if not value is None}
+        if value is not None}
 
     # Then pop these known items and pass them on to the FUSE constructor
-    fuse_args.update({name: args.pop(name)
+    fuse_args.update({
+        name: args.pop(name)
         for name in (
             'foreground',
             'debug')

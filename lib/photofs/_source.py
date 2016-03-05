@@ -82,7 +82,8 @@ class ImageSource(dict):
         """
         # Make sure the path begins with a path separator
         if path[0] != os.path.sep:
-            raise ValueError('"%s" does not begin with "%s"',
+            raise ValueError(
+                '"%s" does not begin with "%s"',
                 path,
                 os.path.sep)
         elif path == os.path.sep:
@@ -143,7 +144,8 @@ class ImageSource(dict):
             for images that do not have a title.
         """
         if kwargs:
-            raise ValueError('Unsupported command line argument: %s',
+            raise ValueError(
+                'Unsupported command line argument: %s',
                 ', '.join(k for k in kwargs))
         super(ImageSource, self).__init__()
 
@@ -184,7 +186,8 @@ class FileBasedImageSource(ImageSource):
         :param argparse.ArgumentParser argparser: The argument parser to which
             to add arguments.
         """
-        argparser.add_argument('--database',
+        argparser.add_argument(
+            '--database',
             help='The database file to use. If not specified, the default one '
             'is used.')
 

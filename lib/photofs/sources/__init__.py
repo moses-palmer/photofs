@@ -7,10 +7,11 @@ def _names():
     import os
     import pkg_resources
 
-    return (None
-        or pkg_resources.resource_listdir('photofs', 'sources')
-        or os.listdir(os.path.dirname(__file__)))
+    return (
+        pkg_resources.resource_listdir('photofs', 'sources') or
+        os.listdir(os.path.dirname(__file__)))
 
-__all__ = [name.rsplit('.', 1)[0]
+__all__ = [
+    name.rsplit('.', 1)[0]
     for name in _names()
     if name.endswith('.py') and not name[0] == '_']

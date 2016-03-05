@@ -70,7 +70,8 @@ class Image(object):
     def title(self):
         """The title of this image. Use this to generate the file name if it is
         set."""
-        return self._title or time.strftime(self.DATE_FORMAT,
+        return self._title or time.strftime(
+            self.DATE_FORMAT,
             self.timestamp.timetuple())
 
     @property

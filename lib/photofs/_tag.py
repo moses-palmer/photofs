@@ -49,10 +49,11 @@ class Tag(dict):
 
     def __setitem__(self, k, v):
         # Make sure keys are strings and items are images or tags
-        if not isinstance(k, str) and not (False
-                or isinstance(v, Image)
-                or isinstance(v, Tag)):
-            raise ValueError('Cannot add %s to Tag',
+        if not isinstance(k, str) and not (
+                isinstance(v, Image) or
+                isinstance(v, Tag)):
+            raise ValueError(
+                'Cannot add %s to Tag',
                 str(v))
 
         super(Tag, self).__setitem__(k, v)
@@ -134,5 +135,6 @@ class Tag(dict):
             self._has_video = self._has_image or item.has_image
 
         else:
-            raise ValueError('Cannot add %s to a Tag',
+            raise ValueError(
+                'Cannot add %s to a Tag',
                 str(item))

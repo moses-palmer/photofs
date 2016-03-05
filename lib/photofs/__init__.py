@@ -54,7 +54,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
     :raises RuntimeError: if an error occurs
     """
-    def __init__(self,
+
+    def __init__(
+            self,
             mountpoint,
             source=list(ImageSource.SOURCES.keys())[0],
             photo_path='Photos',
@@ -85,14 +87,16 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             # Load the photo and video resolvers
             self.resolvers = {
-                self.photo_path: self.ImageResolver(self,
+                self.photo_path: self.ImageResolver(
+                    self,
                     lambda i: not i.is_video
-                        if isinstance(i, Image)
-                        else not i.has_video),
-                self.video_path: self.ImageResolver(self,
+                    if isinstance(i, Image)
+                    else not i.has_video),
+                self.video_path: self.ImageResolver(
+                    self,
                     lambda i: i.is_video
-                        if isinstance(i, Image)
-                        else i.has_video)}
+                    if isinstance(i, Image)
+                    else i.has_video)}
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
@@ -102,10 +106,12 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
         except Exception as e:
             try:
-                raise RuntimeError('Failed to initialise file system: %s',
+                raise RuntimeError(
+                    'Failed to initialise file system: %s',
                     e.args[0] % e.args[1:])
             except:
-                raise RuntimeError('Failed to initialise file system: %s',
+                raise RuntimeError(
+                    'Failed to initialise file system: %s',
                     str(e))
 
     def __getitem__(self, path):
@@ -155,7 +161,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 if isinstance(item, Image):
                     return include_filter(item)
                 elif isinstance(item, Tag):
-                    return any(recursive_filter(item)
+                    return any(
+                        recursive_filter(item)
                         for item in item.values())
                 else:
                     return False
@@ -191,7 +198,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                     return self.fs.dirstat
 
                 else:
-                    raise RuntimeError('Unknown object: %s',
+                    raise RuntimeError(
+                        'Unknown object: %s',
                         os.path.sep.join(root, path))
 
             except KeyError:
@@ -218,12 +226,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 if isinstance(item, dict):
                     # This is a directory; this matches both Tag and
                     # ImageSource
-                    return [k
+                    return [
+                        k
                         for k, v in item.items()
                         if self._include_filter(v)]
 
                 else:
-                    raise RuntimeError('Unknown object: %s',
+                    raise RuntimeError(
+                        'Unknown object: %s',
                         os.path.join(root, path))
 
             except KeyError:
@@ -242,7 +252,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         :raises ValueError: if ``path`` does not begin with :attr:`os.path.sep`
         """
         if path[0] != os.path.sep:
-            raise ValueError('%s is not a valid path',
+            raise ValueError(
+                '%s is not a valid path',
                 path)
         path = path[len(os.path.sep):]
 
@@ -286,22 +297,19 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         except OSError as e:
             raise fuse.FuseOSError(e.errno)
 
-
     def readdir(self, path, offset):
         try:
             root, rest = self.split_path(path)
 
             if not root:
                 # The root contains the resolver names
-                items = [d
-                    for d in self.resolvers.keys()]
+                items = [d for d in self.resolvers.keys()]
             else:
                 items = self.resolvers[root].readdir(root, os.path.sep + rest)
 
             # We return tuples instead of strings since fusepy on Python 2.x
             # incorrectly treats unicode as non-string
-            return [(i, None, 0)
-                for i in items]
+            return [(i, None, 0) for i in items]
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
