@@ -34,6 +34,8 @@ def main():
 
     def filter_type(name, include):
         def inner(value):
+            if filter_type.filters is None:
+                return
             try:
                 filter_type.filters[value] = include
             except AttributeError:
@@ -62,6 +64,16 @@ def main():
             i.is_video
             if isinstance(i, Image)
             else i.has_video))
+
+    class FlatPresentationAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string):
+            filter_type.filters = None
+
+    parser.add_argument(
+        '--flat-presentation',
+        nargs=0,
+        help='Do not separate photos and videos.',
+        action=FlatPresentationAction)
 
     parser.add_argument(
         '--date-format',
