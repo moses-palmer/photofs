@@ -32,13 +32,48 @@ def main():
         help='Run the daemon in the foreground.',
         action='store_true')
 
+    def filter_type(name, include):
+        def inner(value):
+            if filter_type.filters is None:
+                return
+            try:
+                filter_type.filters[value] = include
+            except AttributeError:
+                filter_types.filters = {name: include}
+        return inner
+    filter_type.filters = {}
+
     parser.add_argument(
         '--photo-path',
-        help='The name of the top level directory that contains photos.')
+        help='The name of the top level directory that contains photos.',
+        default='Photos',
+        type=filter_type(
+            '--photo-path',
+            lambda i:
+            not i.is_video
+            if isinstance(i, Image)
+            else not i.has_video))
 
     parser.add_argument(
         '--video-path',
-        help='The name of the top level directory that contains videos.')
+        help='The name of the top level directory that contains videos.',
+        default='Videos',
+        type=filter_type(
+            '--video-path',
+            lambda i:
+            i.is_video
+            if isinstance(i, Image)
+            else i.has_video))
+
+    class FlatPresentationAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string):
+            filter_type.filters = None
+
+    parser.add_argument(
+        '--flat-presentation',
+        nargs=0,
+        help='Do not separate photos and videos.',
+        action=FlatPresentationAction)
 
     parser.add_argument(
         '--date-format',
@@ -78,7 +113,7 @@ def main():
         if name in args})
 
     try:
-        photo_fs = PhotoFS(**args)
+        photo_fs = PhotoFS(filters=filter_type.filters, **args)
         fuse.FUSE(photo_fs, args['mountpoint'], fsname='photofs', **fuse_args)
     except Exception as e:
         import traceback
