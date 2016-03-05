@@ -25,7 +25,7 @@ import time
 import errno
 import fuse
 
-from ._image import Image
+from ._image import Image, FileBasedImage
 from ._source import ImageSource
 from ._tag import Tag
 
@@ -74,7 +74,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.creation = None
         self.dirstat = None
         self.image_source = None
-        self.resolvers = {}
+        self.filters = {}
 
         self.handles = {}
 
@@ -86,14 +86,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             self.photo_path = str(self.photo_path)
             self.video_path = str(self.video_path)
 
-            # Load the photo and video resolvers
-            self.resolvers = {
-                self.photo_path: self.ImageResolver(
+            # Load the photo and video filters
+            self.filters = {
+                self.photo_path: self.ImageFilter(
                     self,
                     lambda i: not i.is_video
                     if isinstance(i, Image)
                     else not i.has_video),
-                self.video_path: self.ImageResolver(
+                self.video_path: self.ImageFilter(
                     self,
                     lambda i: i.is_video
                     if isinstance(i, Image)
@@ -131,7 +131,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     def destroy(self, path):
         pass
 
-    class ImageResolver(object):
+    class ImageFilter(object):
         """This class resolves image requests.
         """
 
@@ -269,14 +269,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             root, rest = self.split_path(path)
 
             if not rest:
-                # Unless path is the root, it must be in the resolvers; the
+                # Unless path is the root, it must be in the filters; the
                 # root and any items directly below it are directories
-                if root and root not in self.resolvers:
+                if root and root not in self.filters:
                     raise fuse.FuseOSError(errno.ENOENT)
                 else:
                     st = self.dirstat
             else:
-                st = self.resolvers[root].getattr(root, os.path.sep + rest)
+                st = self.filters[root].getattr(root, os.path.sep + rest)
 
             return dict(
                 # Remove write permission bits
@@ -306,9 +306,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             if not root:
                 # The root contains the resolver names
-                items = [d for d in self.resolvers.keys()]
+                items = [d for d in self.filters.keys()]
             else:
-                items = self.resolvers[root].readdir(root, os.path.sep + rest)
+                items = self.filters[root].readdir(root, os.path.sep + rest)
 
             # We return tuples instead of strings since fusepy on Python 2.x
             # incorrectly treats unicode as non-string
