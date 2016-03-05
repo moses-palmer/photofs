@@ -125,7 +125,7 @@ class ImageSource(dict):
         # Create all tags
         current = self
         for segment in segments:
-            if not segment in current:
+            if segment not in current:
                 tag = Tag(segment, current if current != self else None)
                 if current == self:
                     # If the tag does not exist, and this is a root tag
