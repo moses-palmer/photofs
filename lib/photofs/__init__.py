@@ -133,6 +133,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     class ImageResolver(object):
         """This class resolves image requests.
         """
+
         def __init__(self, file_system, include_filter):
             """Creates an image resolver for a specific source and filter.
 
