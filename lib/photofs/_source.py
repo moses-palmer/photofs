@@ -184,11 +184,11 @@ class FileBasedImageSource(ImageSource):
         :param argparse.ArgumentParser argparser: The argument parser to which
             to add arguments.
         """
-        argparser.add_argument('--database', help =
-            'The database file to use. If not specified, the default one is '
-            'used.')
+        argparser.add_argument('--database',
+            help='The database file to use. If not specified, the default one '
+            'is used.')
 
-    def __init__(self, database = None, **kwargs):
+    def __init__(self, database=None, **kwargs):
         """Creates a new ImageSource.
 
         :param str database: The path to the backend database or directory for

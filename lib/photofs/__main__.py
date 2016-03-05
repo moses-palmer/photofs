@@ -7,35 +7,40 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog = 'photofs',
-        add_help = True,
-        description =
-            'Explore tagged images from Shotwell in the file system.',
-        epilog =
-            'In addition to the command line options specified above, this '
-            'program accepts all standard FUSE command line options.')
+        prog='photofs',
+        add_help=True,
+        description='Explore tagged images from Shotwell in the file system.',
+        epilog='In addition to the command line options specified above, this '
+        'program accepts all standard FUSE command line options.')
 
-    parser.add_argument('mountpoint',
-        help = 'The file system mount point.')
+    parser.add_argument(
+        'mountpoint',
+        help='The file system mount point.')
 
-    parser.add_argument('--debug', '-d',
-        help = 'Enable debug logging.',
-        type = bool)
+    parser.add_argument(
+        '--debug', '-d',
+        help='Enable debug logging.',
+        type=bool)
 
-    parser.add_argument('--foreground', '-f',
-        help = 'Run the daemon in the foreground.',
-        action = 'store_true')
+    parser.add_argument(
+        '--foreground', '-f',
+        help='Run the daemon in the foreground.',
+        action='store_true')
 
-    parser.add_argument('--photo-path',
-        help = 'The name of the top level directory that contains photos.')
+    parser.add_argument(
+        '--photo-path',
+        help='The name of the top level directory that contains photos.')
 
-    parser.add_argument('--video-path',
-        help = 'The name of the top level directory that contains videos.')
+    parser.add_argument(
+        '--video-path',
+        help='The name of the top level directory that contains videos.')
 
-    parser.add_argument('--date-format',
-        help = 'The format to use for timestamps.')
+    parser.add_argument(
+        '--date-format',
+        help='The format to use for timestamps.')
 
     fuse_args = {}
+
     class OAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string):
             try:
@@ -66,7 +71,7 @@ def main():
 
     try:
         photo_fs = PhotoFS(**args)
-        fuse.FUSE(photo_fs, args['mountpoint'], fsname = 'photofs', **fuse_args)
+        fuse.FUSE(photo_fs, args['mountpoint'], fsname='photofs', **fuse_args)
     except Exception as e:
         import traceback; traceback.print_exc()
         try:

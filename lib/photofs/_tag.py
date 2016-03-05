@@ -57,7 +57,7 @@ class Tag(dict):
 
         super(Tag, self).__setitem__(k, v)
 
-    def __init__(self, name, parent = None):
+    def __init__(self, name, parent=None):
         """Initialises a named tag.
 
         :param str name: The name of the tag.

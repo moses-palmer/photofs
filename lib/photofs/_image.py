@@ -29,7 +29,7 @@ class Image(object):
     #: The date format used to construct the title when none is set
     DATE_FORMAT = '%Y-%m-%d, %H.%M'
 
-    def __init__(self, title, extension, timestamp, st, is_video = None):
+    def __init__(self, title, extension, timestamp, st, is_video=None):
         """Initialises an image.
 
         :param str title: The title of the image. This should be used to
@@ -102,8 +102,7 @@ class Image(object):
 class FileBasedImage(Image):
     """An image or video.
     """
-
-    def __init__(self, title, location, timestamp, is_video = None):
+    def __init__(self, title, location, timestamp, is_video=None):
         """Initialises a file based image.
 
         :param str title: The title of the image. This should be used to

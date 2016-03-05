@@ -56,10 +56,10 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     """
     def __init__(self,
             mountpoint,
-            source = list(ImageSource.SOURCES.keys())[0],
-            photo_path = 'Photos',
-            video_path = 'Videos',
-            date_format = '%Y-%m-%d, %H.%M',
+            source=list(ImageSource.SOURCES.keys())[0],
+            photo_path='Photos',
+            video_path='Videos',
+            date_format='%Y-%m-%d, %H.%M',
             **kwargs):
         super(PhotoFS, self).__init__()
 
@@ -251,7 +251,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         else:
             return (path, '')
 
-    def getattr(self, path, fh = None):
+    def getattr(self, path, fh=None):
         try:
             root, rest = self.split_path(path)
 
@@ -267,18 +267,18 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             return dict(
                 # Remove write permission bits
-                st_mode = st.st_mode & ~146,
+                st_mode=st.st_mode & ~146,
 
-                st_gid = st.st_gid,
-                st_uid = st.st_uid,
+                st_gid=st.st_gid,
+                st_uid=st.st_uid,
 
-                st_nlink = st.st_nlink,
+                st_nlink=st.st_nlink,
 
-                st_atime = st.st_atime,
-                st_ctime = st.st_ctime,
-                st_mtime = st.st_mtime,
+                st_atime=st.st_atime,
+                st_ctime=st.st_ctime,
+                st_mtime=st.st_mtime,
 
-                st_size = st.st_size)
+                st_size=st.st_size)
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
