@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -99,8 +100,8 @@ class Tag(dict):
     def add(self, item):
         """Adds an image or tag to this tag.
 
-        If a tag is added, it will be stored with the key ``item.name``. If this
-        key already has a value, the following action is taken:
+        If a tag is added, it will be stored with the key ``item.name``. If
+        this key already has a value, the following action is taken:
 
         - If the value is a tag, the new tag overwrites it.
         - If the value is an image, a new unique name is generated and the

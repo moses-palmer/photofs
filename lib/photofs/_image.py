@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -43,9 +44,9 @@ class Image(object):
 
         :param os.stat_result st: The ``stat`` value for this item.
 
-        :param bool is_video: Whether this image is a video. This must be either
-            ``True`` or ``False``, or ``None``. If it is ``None``, the type is
-            inferred from the file *MIME type*.
+        :param bool is_video: Whether this image is a video. This must be
+            either ``True`` or ``False``, or ``None``. If it is ``None``, the
+            type is inferred from the file *MIME type*.
         """
         super(Image, self).__init__()
         self._title = title
@@ -115,9 +116,9 @@ class FileBasedImage(Image):
             created.
         :type timestamp: int or datetime.datetime
 
-        :param bool is_video: Whether this image is a video. This must be either
-            ``True`` or ``False``, or ``None``. If it is ``None``, the type is
-            inferred from the file *MIME type*.
+        :param bool is_video: Whether this image is a video. This must be
+            either ``True`` or ``False``, or ``None``. If it is ``None``, the
+            type is inferred from the file *MIME type*.
         """
         super(FileBasedImage, self).__init__(
             title,

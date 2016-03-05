@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -129,8 +130,8 @@ class ImageSource(dict):
                 if current == self:
                     # If the tag does not exist, and this is a root tag
                     # (current == self => this is the first iteration), add the
-                    # tag to self; the parent parameter to Tag above will handle
-                    # other cases
+                    # tag to self; the parent parameter to Tag above will
+                    # handle other cases
                     self[segment] = tag
             current = current[segment]
 

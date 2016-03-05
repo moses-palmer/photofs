@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -140,10 +141,10 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 """The recursive filter used to actually filter the image
                 source.
 
-                This function will simply call include_filter in the outer scope
-                if item is an instance of :class:`Image`, otherwise it will
-                recursively call itself on all items in the tag, and return
-                whether the filtered tag contains any subitems.
+                This function will simply call include_filter in the outer
+                scope if item is an instance of :class:`Image`, otherwise it
+                will recursively call itself on all items in the tag, and
+                return whether the filtered tag contains any subitems.
 
                 :param item: The item to filter.
                 :type item: Image or Tag
@@ -185,7 +186,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                     return item.stat
 
                 elif isinstance(item, dict):
-                    # This is a directory; this matches both Tag and ImageSource
+                    # This is a directory; this matches both Tag and
+                    # ImageSource
                     return self.fs.dirstat
 
                 else:
@@ -214,7 +216,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 item = self.fs.image_source.locate(path)
 
                 if isinstance(item, dict):
-                    # This is a directory; this matches both Tag and ImageSource
+                    # This is a directory; this matches both Tag and
+                    # ImageSource
                     return [k
                         for k, v in item.items()
                         if self._include_filter(v)]
@@ -253,9 +256,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             root, rest = self.split_path(path)
 
             if not rest:
-                # Unless path is the root, it must be in the resolvers; the root
-                # and any items directly below it are directories
-                if root and not root in self.resolvers:
+                # Unless path is the root, it must be in the resolvers; the
+                # root and any items directly below it are directories
+                if root and root not in self.resolvers:
                     raise fuse.FuseOSError(errno.ENOENT)
                 else:
                     st = self.dirstat
