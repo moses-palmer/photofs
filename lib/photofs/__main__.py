@@ -23,6 +23,11 @@ def main():
         type=bool)
 
     parser.add_argument(
+        '--use-links', '-l',
+        help='Report images as links. This will generally improve performance',
+        action='store_true')
+
+    parser.add_argument(
         '--foreground', '-f',
         help='Run the daemon in the foreground.',
         action='store_true')

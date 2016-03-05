@@ -46,6 +46,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         selected image source.
     :type database: str or None
 
+    :param bool use_links: Whether to report file based images as links.
+
     :param str photo_path: The directory in the mounted root to contain photos.
 
     :param str video_path: The directory in the mounted root to contain videos.
@@ -60,6 +62,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             self,
             mountpoint,
             source=list(ImageSource.SOURCES.keys())[0],
+            use_links=False,
             photo_path='Photos',
             video_path='Videos',
             date_format='%Y-%m-%d, %H.%M',
@@ -67,6 +70,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         super(PhotoFS, self).__init__()
 
         self.source = source
+        self.use_links = use_links
         self.photo_path = photo_path
         self.video_path = video_path
         Image.DATE_FORMAT = date_format
@@ -204,7 +208,11 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
 
-        if isinstance(item, Image):
+        if self.use_links and isinstance(item, FileBasedImage):
+            # This is a link
+            st = os.stat_result((item.stat[0] | stat.S_IFLNK,) + item.stat[1:])
+
+        elif isinstance(item, Image):
             # This is a file
             st = item.stat
 
