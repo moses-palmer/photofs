@@ -71,12 +71,12 @@ class Tag(dict):
         self._name = name
         self._parent = parent
 
+        self._has_video = False
+        self._has_image = False
+
         # Make sure to add ourselves to the parent tag if specified
         if parent:
             parent.add(self)
-
-        self._has_video = False
-        self._has_image = False
 
     @property
     def name(self):
