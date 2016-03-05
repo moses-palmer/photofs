@@ -17,6 +17,7 @@
 # this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import stat
 import threading
 import time
 
@@ -279,7 +280,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             return dict(
                 # Remove write permission bits
-                st_mode=st.st_mode & ~146,
+                st_mode=st.st_mode & ~(
+                    stat.S_IWGRP | stat.S_IWUSR | stat.S_IWOTH),
 
                 st_gid=st.st_gid,
                 st_uid=st.st_uid,
