@@ -48,7 +48,9 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
     :param bool use_links: Whether to report file based images as links.
 
-    :param str photo_path: The directory in the mounted root to contain photos.
+    :param dict filters: A mapping from top level directory to filtering
+        function. If this is falsy, no filters are used, and root tags are used
+        to populate the root directory.
 
     :param str video_path: The directory in the mounted root to contain videos.
 
@@ -63,22 +65,19 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
             mountpoint,
             source=list(ImageSource.SOURCES.keys())[0],
             use_links=False,
-            photo_path='Photos',
-            video_path='Videos',
+            filters={},
             date_format='%Y-%m-%d, %H.%M',
             **kwargs):
         super(PhotoFS, self).__init__()
 
         self.source = source
         self.use_links = use_links
-        self.photo_path = photo_path
-        self.video_path = video_path
+        self.filters = filters
         Image.DATE_FORMAT = date_format
 
         self.creation = None
         self.dirstat = None
         self.image_source = None
-        self.filters = {}
 
         self.handles = {}
 
@@ -86,21 +85,6 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         self.image_source = ImageSource.get(self.source)(**kwargs)
 
         try:
-            # Make sure the photo and video paths are strs
-            self.photo_path = str(self.photo_path)
-            self.video_path = str(self.video_path)
-
-            # Load the photo and video filters
-            self.filters = {
-                self.photo_path: lambda i:
-                    not i.is_video
-                    if isinstance(i, Image)
-                    else not i.has_video,
-                self.video_path: lambda i:
-                    i.is_video
-                    if isinstance(i, Image)
-                    else i.has_video}
-
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
 
