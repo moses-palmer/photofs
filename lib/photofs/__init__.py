@@ -320,6 +320,13 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         except OSError as e:
             raise fuse.FuseOSError(e.errno)
 
+    def readlink(self, path):
+        item = self[path]
+        try:
+            return item.location
+        except:
+            raise fuse.FuseOSError(errno.EINVAL)
+
     def open(self, path, flags):
         item = self[path]
         if isinstance(item, Image):
