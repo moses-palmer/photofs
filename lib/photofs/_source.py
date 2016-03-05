@@ -133,7 +133,9 @@ class ImageSource(dict):
                     # tag to self; the parent parameter to Tag above will
                     # handle other cases
                     self[segment] = tag
-            current = current[segment]
+                current = tag
+            else:
+                current = current[segment]
 
         return current
 
