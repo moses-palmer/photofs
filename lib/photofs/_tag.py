@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 # photofs
-# Copyright (C) 2012-2014 Moses Palmér
+# Copyright (C) 2012-2016 Moses Palmér
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -48,15 +49,16 @@ class Tag(dict):
 
     def __setitem__(self, k, v):
         # Make sure keys are strings and items are images or tags
-        if not isinstance(k, str) and not (False
-                or isinstance(v, Image)
-                or isinstance(v, Tag)):
-            raise ValueError('Cannot add %s to Tag',
+        if not isinstance(k, str) and not (
+                isinstance(v, Image) or
+                isinstance(v, Tag)):
+            raise ValueError(
+                'Cannot add %s to Tag',
                 str(v))
 
         super(Tag, self).__setitem__(k, v)
 
-    def __init__(self, name, parent = None):
+    def __init__(self, name, parent=None):
         """Initialises a named tag.
 
         :param str name: The name of the tag.
@@ -99,8 +101,8 @@ class Tag(dict):
     def add(self, item):
         """Adds an image or tag to this tag.
 
-        If a tag is added, it will be stored with the key ``item.name``. If this
-        key already has a value, the following action is taken:
+        If a tag is added, it will be stored with the key ``item.name``. If
+        this key already has a value, the following action is taken:
 
         - If the value is a tag, the new tag overwrites it.
         - If the value is an image, a new unique name is generated and the
@@ -133,5 +135,6 @@ class Tag(dict):
             self._has_video = self._has_image or item.has_image
 
         else:
-            raise ValueError('Cannot add %s to a Tag',
+            raise ValueError(
+                'Cannot add %s to a Tag',
                 str(item))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 # photofs
-# Copyright (C) 2012-2014 Moses Palmér
+# Copyright (C) 2012-2016 Moses Palmér
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -18,7 +19,6 @@
 import os
 
 from ._util import make_unique
-from ._image import Image
 from ._tag import Tag
 
 
@@ -82,7 +82,8 @@ class ImageSource(dict):
         """
         # Make sure the path begins with a path separator
         if path[0] != os.path.sep:
-            raise ValueError('"%s" does not begin with "%s"',
+            raise ValueError(
+                '"%s" does not begin with "%s"',
                 path,
                 os.path.sep)
         elif path == os.path.sep:
@@ -124,13 +125,13 @@ class ImageSource(dict):
         # Create all tags
         current = self
         for segment in segments:
-            if not segment in current:
+            if segment not in current:
                 tag = Tag(segment, current if current != self else None)
                 if current == self:
                     # If the tag does not exist, and this is a root tag
                     # (current == self => this is the first iteration), add the
-                    # tag to self; the parent parameter to Tag above will handle
-                    # other cases
+                    # tag to self; the parent parameter to Tag above will
+                    # handle other cases
                     self[segment] = tag
             current = current[segment]
 
@@ -143,7 +144,8 @@ class ImageSource(dict):
             for images that do not have a title.
         """
         if kwargs:
-            raise ValueError('Unsupported command line argument: %s',
+            raise ValueError(
+                'Unsupported command line argument: %s',
                 ', '.join(k for k in kwargs))
         super(ImageSource, self).__init__()
 
@@ -184,11 +186,12 @@ class FileBasedImageSource(ImageSource):
         :param argparse.ArgumentParser argparser: The argument parser to which
             to add arguments.
         """
-        argparser.add_argument('--database', help =
-            'The database file to use. If not specified, the default one is '
-            'used.')
+        argparser.add_argument(
+            '--database',
+            help='The database file to use. If not specified, the default one '
+            'is used.')
 
-    def __init__(self, database = None, **kwargs):
+    def __init__(self, database=None, **kwargs):
         """Creates a new ImageSource.
 
         :param str database: The path to the backend database or directory for

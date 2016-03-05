@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 # photofs
-# Copyright (C) 2012-2014 Moses Palmér
+# Copyright (C) 2012-2016 Moses Palmér
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -10,7 +10,8 @@
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program. If not, see <http://www.gnu.org/licenses/>.
@@ -23,8 +24,8 @@ import time
 import errno
 import fuse
 
-from ._image import Image, FileBasedImage
-from ._source import ImageSource, FileBasedImageSource
+from ._image import Image
+from ._source import ImageSource
 from ._tag import Tag
 
 
@@ -53,12 +54,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
     :raises RuntimeError: if an error occurs
     """
-    def __init__(self,
+
+    def __init__(
+            self,
             mountpoint,
-            source = list(ImageSource.SOURCES.keys())[0],
-            photo_path = 'Photos',
-            video_path = 'Videos',
-            date_format = '%Y-%m-%d, %H.%M',
+            source=list(ImageSource.SOURCES.keys())[0],
+            photo_path='Photos',
+            video_path='Videos',
+            date_format='%Y-%m-%d, %H.%M',
             **kwargs):
         super(PhotoFS, self).__init__()
 
@@ -84,14 +87,16 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             # Load the photo and video resolvers
             self.resolvers = {
-                self.photo_path: self.ImageResolver(self,
+                self.photo_path: self.ImageResolver(
+                    self,
                     lambda i: not i.is_video
-                        if isinstance(i, Image)
-                        else not i.has_video),
-                self.video_path: self.ImageResolver(self,
+                    if isinstance(i, Image)
+                    else not i.has_video),
+                self.video_path: self.ImageResolver(
+                    self,
                     lambda i: i.is_video
-                        if isinstance(i, Image)
-                        else i.has_video)}
+                    if isinstance(i, Image)
+                    else i.has_video)}
 
             # Store the current time as timestamp for directories
             self.creation = int(time.time())
@@ -101,10 +106,12 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
         except Exception as e:
             try:
-                raise RuntimeError('Failed to initialise file system: %s',
+                raise RuntimeError(
+                    'Failed to initialise file system: %s',
                     e.args[0] % e.args[1:])
             except:
-                raise RuntimeError('Failed to initialise file system: %s',
+                raise RuntimeError(
+                    'Failed to initialise file system: %s',
                     str(e))
 
     def __getitem__(self, path):
@@ -126,6 +133,7 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
     class ImageResolver(object):
         """This class resolves image requests.
         """
+
         def __init__(self, file_system, include_filter):
             """Creates an image resolver for a specific source and filter.
 
@@ -140,10 +148,10 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 """The recursive filter used to actually filter the image
                 source.
 
-                This function will simply call include_filter in the outer scope
-                if item is an instance of :class:`Image`, otherwise it will
-                recursively call itself on all items in the tag, and return
-                whether the filtered tag contains any subitems.
+                This function will simply call include_filter in the outer
+                scope if item is an instance of :class:`Image`, otherwise it
+                will recursively call itself on all items in the tag, and
+                return whether the filtered tag contains any subitems.
 
                 :param item: The item to filter.
                 :type item: Image or Tag
@@ -154,7 +162,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 if isinstance(item, Image):
                     return include_filter(item)
                 elif isinstance(item, Tag):
-                    return any(recursive_filter(item)
+                    return any(
+                        recursive_filter(item)
                         for item in item.values())
                 else:
                     return False
@@ -185,11 +194,13 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                     return item.stat
 
                 elif isinstance(item, dict):
-                    # This is a directory; this matches both Tag and ImageSource
+                    # This is a directory; this matches both Tag and
+                    # ImageSource
                     return self.fs.dirstat
 
                 else:
-                    raise RuntimeError('Unknown object: %s',
+                    raise RuntimeError(
+                        'Unknown object: %s',
                         os.path.sep.join(root, path))
 
             except KeyError:
@@ -214,13 +225,16 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
                 item = self.fs.image_source.locate(path)
 
                 if isinstance(item, dict):
-                    # This is a directory; this matches both Tag and ImageSource
-                    return [k
+                    # This is a directory; this matches both Tag and
+                    # ImageSource
+                    return [
+                        k
                         for k, v in item.items()
                         if self._include_filter(v)]
 
                 else:
-                    raise RuntimeError('Unknown object: %s',
+                    raise RuntimeError(
+                        'Unknown object: %s',
                         os.path.join(root, path))
 
             except KeyError:
@@ -239,7 +253,8 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         :raises ValueError: if ``path`` does not begin with :attr:`os.path.sep`
         """
         if path[0] != os.path.sep:
-            raise ValueError('%s is not a valid path',
+            raise ValueError(
+                '%s is not a valid path',
                 path)
         path = path[len(os.path.sep):]
 
@@ -248,14 +263,14 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         else:
             return (path, '')
 
-    def getattr(self, path, fh = None):
+    def getattr(self, path, fh=None):
         try:
             root, rest = self.split_path(path)
 
             if not rest:
-                # Unless path is the root, it must be in the resolvers; the root
-                # and any items directly below it are directories
-                if root and not root in self.resolvers:
+                # Unless path is the root, it must be in the resolvers; the
+                # root and any items directly below it are directories
+                if root and root not in self.resolvers:
                     raise fuse.FuseOSError(errno.ENOENT)
                 else:
                     st = self.dirstat
@@ -264,18 +279,18 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
 
             return dict(
                 # Remove write permission bits
-                st_mode = st.st_mode & ~146,
+                st_mode=st.st_mode & ~146,
 
-                st_gid = st.st_gid,
-                st_uid = st.st_uid,
+                st_gid=st.st_gid,
+                st_uid=st.st_uid,
 
-                st_nlink = st.st_nlink,
+                st_nlink=st.st_nlink,
 
-                st_atime = st.st_atime,
-                st_ctime = st.st_ctime,
-                st_mtime = st.st_mtime,
+                st_atime=st.st_atime,
+                st_ctime=st.st_ctime,
+                st_mtime=st.st_mtime,
 
-                st_size = st.st_size)
+                st_size=st.st_size)
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
@@ -283,22 +298,19 @@ class PhotoFS(fuse.LoggingMixIn, fuse.Operations):
         except OSError as e:
             raise fuse.FuseOSError(e.errno)
 
-
     def readdir(self, path, offset):
         try:
             root, rest = self.split_path(path)
 
             if not root:
                 # The root contains the resolver names
-                items = [d
-                    for d in self.resolvers.keys()]
+                items = [d for d in self.resolvers.keys()]
             else:
                 items = self.resolvers[root].readdir(root, os.path.sep + rest)
 
             # We return tuples instead of strings since fusepy on Python 2.x
             # incorrectly treats unicode as non-string
-            return [(i, None, 0)
-                for i in items]
+            return [(i, None, 0) for i in items]
 
         except KeyError:
             raise fuse.FuseOSError(errno.ENOENT)
