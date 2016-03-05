@@ -19,7 +19,8 @@ import os
 
 from xdg.BaseDirectory import xdg_data_dirs
 
-from .. import *
+from photofs._image import FileBasedImage
+from photofs._source import ImageSource, FileBasedImageSource
 
 
 # Try to import sqlite

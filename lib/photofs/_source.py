@@ -19,7 +19,6 @@
 import os
 
 from ._util import make_unique
-from ._image import Image
 from ._tag import Tag
 
 

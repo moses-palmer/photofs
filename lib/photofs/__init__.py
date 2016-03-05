@@ -24,8 +24,8 @@ import time
 import errno
 import fuse
 
-from ._image import Image, FileBasedImage
-from ._source import ImageSource, FileBasedImageSource
+from ._image import Image
+from ._source import ImageSource
 from ._tag import Tag
 
 
