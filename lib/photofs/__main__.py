@@ -76,7 +76,8 @@ def main():
         photo_fs = PhotoFS(**args)
         fuse.FUSE(photo_fs, args['mountpoint'], fsname='photofs', **fuse_args)
     except Exception as e:
-        import traceback; traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         try:
             sys.stderr.write('%s\n' % e.args[0] % e.args[1:])
         except:
