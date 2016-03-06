@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+1.3 - Flat presentation
+-----------------------
+* Added support for flat presentation of images and videos.
+* Corrected crash when a *Shotwell* image does not exist in the file system.
+
 1.2.1 - Bugfixes
 ----------------
 * Corrected data corruption when multiple threads access same handle

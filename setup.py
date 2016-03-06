@@ -14,7 +14,7 @@ sys.path.append(LIB_DIR)
 
 # Information published on PyPi
 PACKAGE_NAME = 'photofs'
-VERSION = '1.2.1'
+VERSION = '1.3'
 DESCRIPTION = 'Explore tagged photos from Shotwell in the filesystem'
 AUTHOR = 'Moses Palmér'
 PACKAGE_URL = 'https://github.com/moses-palmer/photofs'
