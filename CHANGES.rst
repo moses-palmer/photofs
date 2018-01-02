@@ -1,6 +1,10 @@
 Release Notes
 =============
 
+1.4 - Python 3 compatibility
+----------------------------
+* Added support for *Python 3*.
+
 1.3 - Flat presentation
 -----------------------
 * Added support for flat presentation of images and videos.
