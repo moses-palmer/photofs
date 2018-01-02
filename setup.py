@@ -1,9 +1,9 @@
-#!/usr/bin/env python
-# coding: utf8
+# coding: utf-8
 
 import os
 import setuptools
 import sys
+import codecs
 
 
 LIB_DIR = os.path.join(
@@ -14,17 +14,17 @@ sys.path.append(LIB_DIR)
 
 # Information published on PyPi
 PACKAGE_NAME = 'photofs'
-VERSION = '1.2.1'
+VERSION = '1.3'
 DESCRIPTION = 'Explore tagged photos from Shotwell in the filesystem'
 AUTHOR = 'Moses Palmér'
 PACKAGE_URL = 'https://github.com/moses-palmer/photofs'
-with open(os.path.join(
+with codecs.open(os.path.join(
         os.path.dirname(__file__),
-        'README.rst')) as f:
+        'README.rst'), encoding="UTF-8") as f:
     README = f.read()
-with open(os.path.join(
+with codecs.open(os.path.join(
         os.path.dirname(__file__),
-        'CHANGES.rst')) as f:
+        'CHANGES.rst'), encoding="UTF-8") as f:
     CHANGES = f.read()
 
 
@@ -43,19 +43,23 @@ def setup(**kwargs):
         long_description=README + '\n\n' + CHANGES,
 
         install_requires=[
-            'fusepy >=2.0.2'],
+            'fusepy >=2.0.2',
+            'pyxdg >= 0.25'],
         setup_requires=[],
 
         url=PACKAGE_URL,
 
-        scripts=[
-            'scripts/photofs'],
+        entry_points={
+            'console_scripts': ['photofs=photofs.__main__:main']},
         packages=setuptools.find_packages(LIB_DIR),
         package_dir={'': LIB_DIR},
         zip_safe=True,
 
         license='GPLv3',
-        classifiers=[],
+        classifiers=[
+            'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+            'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3'],
 
         **kwargs)
 

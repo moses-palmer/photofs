@@ -123,7 +123,7 @@ class ShotwellSource(FileBasedImageSource):
                     # Remove the image from the parent tags
                     parent = tag.parent
                     while parent:
-                        for k, v in parent.items():
+                        for k, v in list(parent.items()):
                             if v == image:
                                 del parent[k]
                         parent = parent.parent
