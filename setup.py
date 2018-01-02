@@ -56,7 +56,10 @@ def setup(**kwargs):
         zip_safe=True,
 
         license='GPLv3',
-        classifiers=[],
+        classifiers=[
+            'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+            'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3'],
 
         **kwargs)
 
