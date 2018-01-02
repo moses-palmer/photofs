@@ -48,8 +48,8 @@ def setup(**kwargs):
 
         url=PACKAGE_URL,
 
-        scripts=[
-            'scripts/photofs'],
+        entry_points={
+            'console_scripts': ['photofs=photofs.__main__:main']},
         packages=setuptools.find_packages(LIB_DIR),
         package_dir={'': LIB_DIR},
         zip_safe=True,
