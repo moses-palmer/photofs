@@ -1,9 +1,9 @@
-#!/usr/bin/env python
-# coding: utf8
+# coding: utf-8
 
 import os
 import setuptools
 import sys
+import codecs
 
 
 LIB_DIR = os.path.join(
@@ -18,13 +18,13 @@ VERSION = '1.3'
 DESCRIPTION = 'Explore tagged photos from Shotwell in the filesystem'
 AUTHOR = 'Moses Palmér'
 PACKAGE_URL = 'https://github.com/moses-palmer/photofs'
-with open(os.path.join(
+with codecs.open(os.path.join(
         os.path.dirname(__file__),
-        'README.rst')) as f:
+        'README.rst'), encoding="UTF-8") as f:
     README = f.read()
-with open(os.path.join(
+with codecs.open(os.path.join(
         os.path.dirname(__file__),
-        'CHANGES.rst')) as f:
+        'CHANGES.rst'), encoding="UTF-8") as f:
     CHANGES = f.read()
 
 
